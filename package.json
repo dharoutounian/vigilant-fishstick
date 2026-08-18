@@ -1,0 +1,21 @@
+{
+  "name": "operation-firestorm",
+  "version": "1.0.0",
+  "description": "A 5v5 team-deathmatch FPS in a single self-contained HTML file",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "python3 src/build.py",
+    "test": "node tests/controls.test.js && node tests/controls.test.js --nolock",
+    "test:controls": "node tests/controls.test.js",
+    "test:nolock": "node tests/controls.test.js --nolock",
+    "test:systems": "node tests/systems.test.js",
+    "test:match": "node tests/match.test.js"
+  },
+  "dependencies": {
+    "three": "0.128.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}

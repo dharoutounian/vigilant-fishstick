@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OPERATION FIRESTORM</title>
+<style>
+:root{
+  --acc:#ff8a1f; --acc2:#ffb765; --blue:#4aa8ff; --red:#ff4d4d;
+  --ink:#e8ecf1; --dim:#8b96a5; --bg:#0a0d12; --panel:rgba(10,14,20,.82);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#000;
+  font-family:"Segoe UI",Roboto,system-ui,-apple-system,sans-serif;
+  color:var(--ink);user-select:none;-webkit-user-select:none}
+canvas{display:block}
+#game{position:fixed;inset:0}
+.hide{display:none!important}
+.up{text-transform:uppercase;letter-spacing:.12em}
+
+/* ---------------- HUD ---------------- */
+#hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
+#hud.on{opacity:1}
+
+/* crosshair */
+#xhair{position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
+#xhair div{position:absolute;background:#fff;box-shadow:0 0 3px #000;opacity:.9}
+#xh-t,#xh-b{width:2px;height:8px;left:21px}
+#xh-l,#xh-r{height:2px;width:8px;top:21px}
+#xh-dot{width:2px;height:2px;left:21px;top:21px;opacity:.55}
+#hitmark{position:absolute;left:50%;top:50%;width:30px;height:30px;transform:translate(-50%,-50%) rotate(45deg);opacity:0}
+#hitmark i{position:absolute;background:#fff;box-shadow:0 0 4px #000}
+#hitmark i:nth-child(1){width:2px;height:9px;left:14px;top:0}
+#hitmark i:nth-child(2){width:2px;height:9px;left:14px;bottom:0}
+#hitmark i:nth-child(3){height:2px;width:9px;top:14px;left:0}
+#hitmark i:nth-child(4){height:2px;width:9px;top:14px;right:0}
+#hitmark.kill i{background:#ff3b30}
+
+/* top scorebar */
+#topbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;
+  background:var(--panel);border:1px solid rgba(255,255,255,.09);padding:7px 16px;backdrop-filter:blur(6px);
+  clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%)}
+.tscore{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
+#sBlue{color:var(--blue)} #sRed{color:var(--red)}
+#timer{font-size:15px;color:var(--dim);letter-spacing:.1em;font-variant-numeric:tabular-nums}
+.tbar{width:110px;height:4px;background:rgba(255,255,255,.12);position:relative;overflow:hidden}
+.tbar i{position:absolute;inset:0 auto 0 0;display:block}
+#bBlue i{background:var(--blue)} #bRed i{background:var(--red);left:auto;right:0}
+
+/* minimap */
+#mmwrap{position:absolute;top:14px;left:14px;width:172px}
+#mm{width:172px;height:172px;background:rgba(6,9,14,.78);border:1px solid rgba(255,255,255,.14);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%)}
+#mmlabel{font-size:10px;color:var(--dim);letter-spacing:.18em;margin-top:5px}
+#uavtag{color:var(--acc);float:right}
+
+/* killfeed */
+#feed{position:absolute;top:14px;right:14px;width:330px;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.fe{background:rgba(8,11,16,.8);border-left:2px solid var(--dim);padding:4px 9px;font-size:12.5px;
+  letter-spacing:.03em;animation:fin .18s ease-out;white-space:nowrap}
+@keyframes fin{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+.fe .w{color:var(--acc);margin:0 7px;font-weight:700}
+
+/* bottom left: health + operator */
+#hpwrap{position:absolute;left:22px;bottom:22px;width:270px}
+#opname{font-size:12px;color:var(--dim);letter-spacing:.16em;margin-bottom:5px}
+#opname b{color:var(--ink);font-weight:600}
+#hpbar{height:9px;background:rgba(255,255,255,.1);position:relative;overflow:hidden;
+  clip-path:polygon(0 0,100% 0,calc(100% - 6px) 100%,0 100%)}
+#hpfill{position:absolute;inset:0 auto 0 0;width:100%;background:linear-gradient(90deg,#3ddc84,#8fffbe);transition:width .12s}
+#hpfill.low{background:linear-gradient(90deg,#ff3b30,#ff8a1f)}
+#hpnum{font-size:11px;color:var(--dim);margin-top:4px;letter-spacing:.1em}
+#streakrow{display:flex;gap:8px;margin-top:12px}
+.ks{width:52px;height:38px;background:rgba(8,11,16,.75);border:1px solid rgba(255,255,255,.1);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;opacity:.32;position:relative}
+.ks.rdy{opacity:1;border-color:var(--acc);box-shadow:0 0 14px rgba(255,138,31,.28)}
+.ks svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:1.6}
+.ks.rdy svg{stroke:var(--acc)}
+.ks span{font-size:9px;color:var(--dim);letter-spacing:.08em}
+.ks.rdy span{color:var(--acc2)}
+.ks.act{border-color:#3ddc84}
+.ks.act svg{stroke:#3ddc84}
+
+/* bottom right: ammo */
+#ammowrap{position:absolute;right:24px;bottom:22px;text-align:right}
+#wname{font-size:13px;color:var(--dim);letter-spacing:.2em;margin-bottom:2px}
+#ammo{font-size:40px;font-weight:700;line-height:.95;font-variant-numeric:tabular-nums}
+#ammo small{font-size:19px;color:var(--dim);font-weight:400}
+#ammo.low{color:var(--red)}
+#firemode{font-size:11px;color:var(--dim);letter-spacing:.14em;margin-top:3px}
+#nadecount{font-size:11px;color:var(--dim);letter-spacing:.14em;margin-top:5px}
+#nadecount b{color:var(--ink)}
+#reloadhint{position:absolute;left:50%;top:calc(50% + 56px);transform:translateX(-50%);font-size:13px;
+  letter-spacing:.18em;color:var(--acc);opacity:0;transition:opacity .15s}
+#reloadhint.on{opacity:1;animation:blip 1s infinite}
+@keyframes blip{50%{opacity:.35}}
+
+/* xp bar */
+#xpwrap{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:280px;text-align:center}
+#xpbar{height:3px;background:rgba(255,255,255,.12);position:relative;overflow:hidden}
+#xpfill{position:absolute;inset:0 auto 0 0;background:var(--acc);width:0%;transition:width .3s}
+#xptxt{font-size:10px;color:var(--dim);letter-spacing:.16em;margin-top:5px}
+
+/* damage / effects */
+#vig{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;
+  background:radial-gradient(ellipse at center,transparent 32%,rgba(190,0,0,.62) 100%)}
+/* permanent cinematic vignette + faint scanline, softens the flat WebGL look */
+#filmvig{position:fixed;inset:0;pointer-events:none;z-index:6;
+  background:radial-gradient(ellipse 78% 72% at 50% 48%,transparent 42%,rgba(0,0,0,.42) 100%)}
+#lockhint{position:absolute;left:50%;top:76px;transform:translateX(-50%);font-size:10.5px;letter-spacing:.2em;
+  color:#c9d3df;background:rgba(8,11,16,.72);border:1px solid rgba(255,255,255,.14);padding:6px 14px;
+  white-space:nowrap;pointer-events:none}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+#dmgdirs{position:absolute;inset:0}
+.dind{position:absolute;left:50%;top:50%;width:150px;height:150px;margin:-75px 0 0 -75px;opacity:0}
+.dind svg{width:100%;height:100%}
+#toast{position:absolute;left:50%;top:26%;transform:translateX(-50%);text-align:center;pointer-events:none}
+.tst{font-size:20px;letter-spacing:.22em;color:var(--acc);text-shadow:0 2px 10px #000;animation:tup 1.9s ease-out forwards}
+@keyframes tup{0%{opacity:0;transform:translateY(10px)}14%{opacity:1;transform:none}72%{opacity:1}100%{opacity:0}}
+#xppop{position:absolute;left:50%;top:57%;transform:translateX(-50%);text-align:center;pointer-events:none;width:300px}
+.xpp{font-size:14px;color:var(--acc2);letter-spacing:.1em;text-shadow:0 2px 8px #000;animation:tup 1.5s ease-out forwards}
+
+/* killcam / respawn */
+#dead{position:absolute;inset:0;background:rgba(60,0,0,.28);display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;backdrop-filter:grayscale(.7)}
+#deadby{font-size:15px;letter-spacing:.2em;color:#ffb0b0}
+#deadby b{color:#fff}
+#respawn{font-size:34px;letter-spacing:.2em;font-weight:700}
+
+/* scoreboard */
+#board{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(4,6,10,.82);
+  backdrop-filter:blur(4px);z-index:40}
+#board .card{width:660px;background:var(--panel);border:1px solid rgba(255,255,255,.1);padding:22px 26px}
+#board h3{font-size:13px;letter-spacing:.24em;color:var(--dim);font-weight:600;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:10px;letter-spacing:.16em;color:var(--dim);font-weight:600;padding:0 0 6px}
+td{padding:5px 0;border-top:1px solid rgba(255,255,255,.06);font-variant-numeric:tabular-nums}
+td.n{width:52%}
+tr.me td{color:var(--acc2)}
+.teamhead{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 4px}
+.teamhead span{font-size:12px;letter-spacing:.2em}
+.tb{color:var(--blue)} .tr{color:var(--red)}
+
+/* ---------------- MENUS ---------------- */
+#menu{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;backdrop-filter:blur(2px);
+  background:radial-gradient(ellipse at 30% 10%,rgba(22,32,44,.80) 0%,rgba(8,11,16,.92) 52%,rgba(4,6,10,.97) 100%)}
+#menu:before{content:"";position:absolute;inset:0;opacity:.5;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px)}
+#mtop{padding:34px 46px 0;position:relative}
+#logo{font-size:44px;font-weight:800;letter-spacing:.1em;line-height:1}
+#logo b{color:var(--acc)}
+#tag{font-size:11px;letter-spacing:.42em;color:var(--dim);margin-top:8px}
+#lvlchip{position:absolute;right:46px;top:34px;text-align:right}
+#lvlchip .l{font-size:30px;font-weight:800;color:var(--acc)}
+#lvlchip .s{font-size:10px;letter-spacing:.2em;color:var(--dim)}
+#lvlchip .xb{width:150px;height:3px;background:rgba(255,255,255,.12);margin-top:6px;position:relative}
+#lvlchip .xb i{position:absolute;inset:0 auto 0 0;background:var(--acc)}
+
+#mbody{flex:1;display:flex;gap:26px;padding:26px 46px 34px;position:relative;min-height:0}
+#tabs{width:210px;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.tab{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid transparent;
+  padding:13px 16px;font-size:13px;letter-spacing:.18em;cursor:pointer;transition:.14s;color:var(--dim)}
+.tab:hover{background:rgba(255,255,255,.07);color:var(--ink)}
+.tab.sel{border-left-color:var(--acc);color:#fff;background:rgba(255,138,31,.11)}
+#deploy{margin-top:auto;background:var(--acc);color:#10130f;border:none;padding:17px;font-size:16px;font-weight:800;
+  letter-spacing:.2em;cursor:pointer;clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  font-family:inherit;transition:.14s}
+#deploy:hover{background:#ffa040;box-shadow:0 0 26px rgba(255,138,31,.4)}
+#panes{flex:1;overflow:auto;min-height:0;padding-right:6px}
+#panes::-webkit-scrollbar{width:6px}
+#panes::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16)}
+.pane{display:none} .pane.sel{display:block}
+.ph{font-size:11px;letter-spacing:.26em;color:var(--dim);margin:0 0 12px}
+.ph:not(:first-child){margin-top:26px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:10px}
+.card2{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);padding:13px 14px;cursor:pointer;
+  transition:.14s;position:relative;overflow:hidden}
+.card2:hover{background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.2)}
+.card2.sel{border-color:var(--acc);background:rgba(255,138,31,.1)}
+.card2.lock{opacity:.42;cursor:not-allowed}
+.card2 .nm{font-size:14px;font-weight:700;letter-spacing:.06em}
+.card2 .ty{font-size:10px;color:var(--dim);letter-spacing:.16em;margin-top:2px}
+.card2 .ds{font-size:11.5px;color:var(--dim);margin-top:8px;line-height:1.45}
+.card2 .lk{position:absolute;top:10px;right:12px;font-size:9.5px;letter-spacing:.12em;color:var(--acc);
+  border:1px solid rgba(255,138,31,.45);padding:2px 6px}
+.stat{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:10px;color:var(--dim);letter-spacing:.1em}
+.stat .b{flex:1;height:3px;background:rgba(255,255,255,.12);position:relative}
+.stat .b i{position:absolute;inset:0 auto 0 0;background:var(--acc2)}
+.selmark{position:absolute;bottom:0;right:0;background:var(--acc);color:#10130f;font-size:9px;padding:2px 7px;
+  letter-spacing:.14em;font-weight:700}
+kbd{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);padding:2px 7px;font-size:11px;
+  font-family:inherit;letter-spacing:.06em;border-radius:2px;min-width:24px;display:inline-block;text-align:center}
+.krow{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+.krow .kk{width:210px;flex-shrink:0;display:flex;gap:5px}
+.krow .kd{color:var(--dim)}
+.setrow{display:flex;align-items:center;gap:14px;padding:9px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05)}
+.setrow label{width:200px;color:var(--dim);letter-spacing:.1em;font-size:12px}
+.setrow input[type=range]{flex:1;max-width:280px;accent-color:var(--acc)}
+.setrow .v{width:52px;text-align:right;font-variant-numeric:tabular-nums;color:var(--acc2)}
+.setrow select{background:#131922;color:var(--ink);border:1px solid rgba(255,255,255,.16);padding:6px 10px;
+  font-family:inherit;font-size:12px;letter-spacing:.08em}
+
+/* pause + results */
+.ovl{position:fixed;inset:0;z-index:55;background:rgba(4,6,10,.86);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.ovl h2{font-size:30px;letter-spacing:.24em;font-weight:800}
+.ovl .btn{width:270px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:var(--ink);
+  padding:13px;font-size:13px;letter-spacing:.2em;cursor:pointer;font-family:inherit;transition:.14s}
+.ovl .btn:hover{background:rgba(255,138,31,.16);border-color:var(--acc)}
+.ovl .btn.pri{background:var(--acc);color:#10130f;font-weight:800;border-color:var(--acc)}
+.ovl .btn.pri:hover{background:#ffa040}
+#resStats{display:flex;gap:34px;margin:6px 0 12px}
+#resStats div{text-align:center}
+#resStats .v{font-size:26px;font-weight:700}
+#resStats .k{font-size:10px;color:var(--dim);letter-spacing:.18em;margin-top:2px}
+#resXp{font-size:13px;color:var(--acc2);letter-spacing:.14em;margin-bottom:6px}
+#unlockList{font-size:12px;color:var(--acc);letter-spacing:.1em;text-align:center;line-height:1.7;max-width:460px}
+/* keep the whole menu usable on short windows — DEPLOY must never fall off screen */
+@media (max-height:760px){
+  #mtop{padding:20px 34px 0}
+  #logo{font-size:32px}
+  #tag{font-size:10px;margin-top:5px}
+  #lvlchip{right:34px;top:20px}
+  #lvlchip .l{font-size:22px}
+  #mbody{padding:16px 34px 20px;gap:18px}
+  #tabs{width:180px;gap:4px}
+  .tab{padding:9px 13px;font-size:12px}
+  #deploy{padding:13px;font-size:14px}
+}
+@media (max-height:580px){
+  #logo{font-size:24px} #mtop{padding:12px 26px 0}
+  .tab{padding:7px 12px;font-size:11px}
+  #mbody{padding:12px 26px 14px}
+  #deploy{padding:10px;font-size:13px}
+}
+#loading{position:fixed;inset:0;z-index:90;background:#05070b;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px}
+#loading .bar{width:220px;height:2px;background:rgba(255,255,255,.14);overflow:hidden}
+#loading .bar i{display:block;height:100%;width:40%;background:var(--acc);animation:ld 1.1s infinite}
+@keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
+#err{position:fixed;inset:0;z-index:99;background:#0a0d12;color:#ff8080;padding:40px;font-family:monospace;
+  font-size:13px;white-space:pre-wrap;overflow:auto}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<!-- ============ HUD ============ -->
+<div id="hud">
+  <div id="xhair"><div id="xh-t"></div><div id="xh-b"></div><div id="xh-l"></div><div id="xh-r"></div><div id="xh-dot"></div></div>
+  <div id="hitmark"><i></i><i></i><i></i><i></i></div>
+
+  <div id="topbar">
+    <div class="tbar" id="bBlue"><i style="width:0%"></i></div>
+    <div class="tscore" id="sBlue">0</div>
+    <div id="timer">10:00</div>
+    <div class="tscore" id="sRed">0</div>
+    <div class="tbar" id="bRed"><i style="width:0%"></i></div>
+  </div>
+
+  <div id="mmwrap">
+    <canvas id="mm" width="344" height="344"></canvas>
+    <div id="mmlabel" class="up">TAC-MAP <span id="uavtag"></span></div>
+  </div>
+
+  <div id="feed"></div>
+
+  <div id="hpwrap">
+    <div id="opname" class="up">OPERATOR <b>—</b></div>
+    <div id="hpbar"><div id="hpfill"></div></div>
+    <div id="hpnum" class="up">100 / 100 HP</div>
+    <div id="streakrow"></div>
+  </div>
+
+  <div id="ammowrap">
+    <div id="wname" class="up">—</div>
+    <div id="ammo">30<small> / 120</small></div>
+    <div id="firemode" class="up">AUTO</div>
+    <div id="nadecount" class="up">FRAG <b>2</b></div>
+  </div>
+  <div id="reloadhint" class="up">PRESS R TO RELOAD</div>
+
+  <div id="xpwrap"><div id="xpbar"><div id="xpfill"></div></div><div id="xptxt" class="up">LVL 1</div></div>
+
+  <div id="dmgdirs"></div>
+  <div id="toast"></div>
+  <div id="xppop"></div>
+  <div id="vig"></div>
+  <div id="flash"></div>
+  <div id="lockhint" class="up hide">CLICK TO CAPTURE MOUSE</div>
+  <div id="dead" class="hide"><div id="deadby" class="up">KILLED BY <b>—</b></div><div id="respawn" class="up">3</div></div>
+</div>
+
+<div id="board" class="hide"><div class="card">
+  <h3 class="up">TEAM DEATHMATCH — OPERATION FIRESTORM</h3>
+  <div class="teamhead"><span class="tb up">TASK FORCE 141</span><span class="tb" id="bdScoreB">0</span></div>
+  <table><thead><tr><th class="n">OPERATOR</th><th>K</th><th>D</th><th>KDR</th><th>STREAK</th></tr></thead><tbody id="bdBlue"></tbody></table>
+  <div class="teamhead"><span class="tr up">SPETSNAZ</span><span class="tr" id="bdScoreR">0</span></div>
+  <table><thead><tr><th class="n">OPERATOR</th><th>K</th><th>D</th><th>KDR</th><th>STREAK</th></tr></thead><tbody id="bdRed"></tbody></table>
+</div></div>
+
+<!-- ============ PAUSE ============ -->
+<div id="pause" class="ovl hide">
+  <h2 class="up">PAUSED</h2>
+  <button class="btn pri up" id="pResume">RESUME</button>
+  <button class="btn up" id="pRestart">RESTART MATCH</button>
+  <button class="btn up" id="pQuit">QUIT TO MENU</button>
+  <div id="perfline" style="font-size:11px;color:var(--dim);letter-spacing:.14em;margin-top:8px" class="up">ESC TO RESUME</div>
+</div>
+
+<!-- ============ RESULTS ============ -->
+<div id="results" class="ovl hide">
+  <h2 class="up" id="resTitle">VICTORY</h2>
+  <div id="resScore" style="font-size:16px;letter-spacing:.2em;color:var(--dim)" class="up">0 — 0</div>
+  <div id="resStats"></div>
+  <div id="resXp" class="up"></div>
+  <div id="unlockList" class="up"></div>
+  <button class="btn pri up" id="rAgain" style="margin-top:10px">PLAY AGAIN</button>
+  <button class="btn up" id="rMenu">MAIN MENU</button>
+</div>
+
+<!-- ============ MAIN MENU ============ -->
+<div id="menu">
+  <div id="mtop">
+    <div id="logo" class="up">OPERATION <b>FIRESTORM</b></div>
+    <div id="tag">5v5 TEAM DEATHMATCH · TACTICAL FPS</div>
+    <div id="lvlchip">
+      <div class="l" id="mLvl">1</div><div class="s up">RANK</div>
+      <div class="xb"><i id="mXp" style="width:0%"></i></div>
+    </div>
+  </div>
+  <div id="mbody">
+    <div id="tabs">
+      <div class="tab sel up" data-p="play">BRIEFING</div>
+      <div class="tab up" data-p="load">LOADOUT</div>
+      <div class="tab up" data-p="ops">OPERATORS</div>
+      <div class="tab up" data-p="ctrl">CONTROLS</div>
+      <div class="tab up" data-p="set">SETTINGS</div>
+      <button id="deploy" class="up">DEPLOY</button>
+    </div>
+    <div id="panes">
+      <div class="pane sel" id="p-play">
+        <div class="ph">MISSION BRIEFING</div>
+        <div style="max-width:660px;font-size:13.5px;line-height:1.75;color:#c3ccd8">
+          Two five-man squads. One compound. First team to <b style="color:var(--acc)">50 eliminations</b> — or the
+          higher score when the ten-minute clock runs dry — takes the site.<br><br>
+          Chain kills without dying to earn <b style="color:var(--acc)">killstreaks</b>: UAV recon at 3, precision
+          airstrike at 5, an automated sentry at 7. Every elimination earns XP; XP unlocks weapons and operators.
+        </div>
+        <div class="ph">CURRENT SETUP</div>
+        <div class="grid" id="briefCards"></div>
+      </div>
+      <div class="pane" id="p-load">
+        <div class="ph">PRIMARY</div><div class="grid" id="gPrim"></div>
+        <div class="ph">SECONDARY</div><div class="grid" id="gSec"></div>
+      </div>
+      <div class="pane" id="p-ops"><div class="ph">SELECT OPERATOR</div><div class="grid" id="gOps"></div></div>
+      <div class="pane" id="p-ctrl">
+        <div class="ph">CONTROLS</div>
+        <div class="krow"><div class="kk"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div class="kd">Move</div></div>
+        <div class="krow"><div class="kk"><kbd>MOUSE</kbd></div><div class="kd">Look — click once to capture the cursor for full 360° aim</div></div>
+        <div class="krow"><div class="kk"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></div><div class="kd">Aim (always works, even without mouse capture)</div></div>
+        <div class="krow"><div class="kk"><kbd>LMB</kbd></div><div class="kd">Fire</div></div>
+        <div class="krow"><div class="kk"><kbd>RMB</kbd><kbd>E</kbd></div><div class="kd">Aim down sights (E toggles)</div></div>
+        <div class="krow"><div class="kk"><kbd>ENTER</kbd></div><div class="kd">Fire (keyboard alternative to LMB)</div></div>
+        <div class="krow"><div class="kk"><kbd>SHIFT</kbd></div><div class="kd">Sprint</div></div>
+        <div class="krow"><div class="kk"><kbd>SPACE</kbd></div><div class="kd">Jump</div></div>
+        <div class="krow"><div class="kk"><kbd>CTRL</kbd><kbd>C</kbd></div><div class="kd">Crouch</div></div>
+        <div class="krow"><div class="kk"><kbd>R</kbd></div><div class="kd">Reload</div></div>
+        <div class="krow"><div class="kk"><kbd>1</kbd><kbd>2</kbd><kbd>Q</kbd></div><div class="kd">Primary / secondary / quick swap</div></div>
+        <div class="krow"><div class="kk"><kbd>G</kbd></div><div class="kd">Throw frag grenade</div></div>
+        <div class="krow"><div class="kk"><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd></div><div class="kd">UAV / airstrike / sentry gun</div></div>
+        <div class="krow"><div class="kk"><kbd>F</kbd></div><div class="kd">Melee</div></div>
+        <div class="krow"><div class="kk"><kbd>TAB</kbd></div><div class="kd">Scoreboard (hold)</div></div>
+        <div class="krow"><div class="kk"><kbd>ESC</kbd></div><div class="kd">Pause</div></div>
+      </div>
+      <div class="pane" id="p-set">
+        <div class="ph">GAMEPLAY</div>
+        <div class="setrow"><label class="up">Mouse sensitivity</label><input type="range" id="sSens" min="20" max="400" value="120"><div class="v" id="vSens">1.20</div></div>
+        <div class="setrow"><label class="up">ADS sensitivity</label><input type="range" id="sAds" min="20" max="150" value="70"><div class="v" id="vAds">0.70</div></div>
+        <div class="setrow"><label class="up">Field of view</label><input type="range" id="sFov" min="65" max="115" value="85"><div class="v" id="vFov">85</div></div>
+        <div class="setrow"><label class="up">Invert Y</label><input type="checkbox" id="sInv"></div>
+        <div class="ph">MATCH</div>
+        <div class="setrow"><label class="up">Bot difficulty</label>
+          <select id="sDiff"><option value="0">RECRUIT</option><option value="1" selected>REGULAR</option><option value="2">HARDENED</option><option value="3">VETERAN</option></select></div>
+        <div class="setrow"><label class="up">Score limit</label><input type="range" id="sLimit" min="10" max="100" step="5" value="50"><div class="v" id="vLimit">50</div></div>
+        <div class="setrow"><label class="up">Time limit (min)</label><input type="range" id="sTime" min="3" max="20" value="10"><div class="v" id="vTime">10</div></div>
+        <div class="ph">AUDIO / VIDEO</div>
+        <div class="setrow"><label class="up">Master volume</label><input type="range" id="sVol" min="0" max="100" value="55"><div class="v" id="vVol">55</div></div>
+        <div class="setrow"><label class="up">Graphics quality</label>
+          <select id="sQual"><option value="0">PERFORMANCE</option><option value="1">BALANCED</option><option value="2" selected>HIGH</option><option value="3">ULTRA</option></select></div>
+        <div class="setrow"><label class="up">Shadows</label><input type="checkbox" id="sShadow" checked></div>
+        <div class="setrow"><label class="up">Render scale</label><input type="range" id="sScale" min="50" max="150" step="5" value="100"><div class="v" id="vScale">100</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="filmvig"></div>
+<div id="loading"><div class="up" style="letter-spacing:.3em;font-size:13px;color:#8b96a5">LOADING ENGINE</div><div class="bar"><i></i></div></div>
+<div id="err" class="hide"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
