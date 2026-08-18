@@ -30,18 +30,27 @@ var TEAM_NAME = ['TASK FORCE 141','SPETSNAZ'];
 var settings = {
   sens: 1.20, adsSens: 0.70, fov: 85, invert:false,
   diff: 1, scoreLimit: 50, timeLimit: 10,
-  vol: 0.55, shadows: true, scale: 1.0, quality: 2
+  vol: 0.55, shadows: true, scale: 1.0, quality: 2,
+  viewBob: 1.0,        // 0 disables camera bob/lean entirely
+  showBody: true       // draw your own legs and torso in first person
 };
 
 // progression lives in memory for the page session
 var profile = { xp: 0, level: 1, primary:'m4', secondary:'m9', operator:'ghost' };
 function xpForLevel(l){ return Math.round(700*l + 90*l*l); }   // xp needed to go l -> l+1
 
+/* Five rifles converge on one target, so what kills you is not any single bot
+   but the stacked damage of the squad — measured at ~32 incoming DPS on
+   REGULAR, spiking past 65 when three of them focus at once. Against that,
+   health alone is a losing lever: it buys HP/DPS seconds and nothing more, and
+   the pool needed for a fair fight would make you a sponge. Damage and
+   accuracy are cut alongside the bigger health pool so a firefight lasts long
+   enough to be a firefight, while a careless push still gets you killed. */
 var DIFF = [
-  { name:'RECRUIT',  react:[0.60,1.05], spread:3.4, dmg:0.42, aggro:0.7, burst:[2,4], acc:0.42, rof:1.35 },
-  { name:'REGULAR',  react:[0.34,0.66], spread:2.2, dmg:0.60, aggro:0.9, burst:[3,6], acc:0.60, rof:1.18 },
-  { name:'HARDENED', react:[0.22,0.44], spread:1.5, dmg:0.76, aggro:1.0, burst:[4,8], acc:0.74, rof:1.08 },
-  { name:'VETERAN',  react:[0.13,0.28], spread:1.0, dmg:0.95, aggro:1.15,burst:[6,12],acc:0.88, rof:1.0 }
+  { name:'RECRUIT',  react:[0.60,1.05], spread:3.4, dmg:0.30, aggro:0.7, burst:[2,4], acc:0.34, rof:1.35 },
+  { name:'REGULAR',  react:[0.34,0.66], spread:2.2, dmg:0.40, aggro:0.9, burst:[3,6], acc:0.50, rof:1.18 },
+  { name:'HARDENED', react:[0.22,0.44], spread:1.5, dmg:0.58, aggro:1.0, burst:[4,8], acc:0.66, rof:1.08 },
+  { name:'VETERAN',  react:[0.13,0.28], spread:1.0, dmg:0.80, aggro:1.15,burst:[6,12],acc:0.84, rof:1.0 }
 ];
 
 /* --------------------------------- math ---------------------------------- */

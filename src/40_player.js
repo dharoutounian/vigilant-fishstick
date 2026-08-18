@@ -15,7 +15,9 @@ var player = {
   grenades:2, nadeT:0,
   streaksReady:{}, streaksUsed:{},
   hitParts:[], op:OPERATORS.ghost,
-  shake:0, xpThisMatch:0, damageDealt:0, killer:null, respawnT:0
+  shake:0, xpThisMatch:0, damageDealt:0, killer:null, respawnT:0,
+  // motion feel: bob phase, landing compression, strafe lean, jump forgiveness
+  bobPhase:0, bobAmp:0, landDip:0, lean:0, coyoteT:0, jumpBufT:0, walkPhase:0
 };
 var actors = [player];
 
@@ -177,6 +179,7 @@ function resetLoadout(){
   for(var k in vm.models) vm.group.remove(vm.models[k]);
   vm.models = {};
   setViewWeapon(player.weapon);
+  tintPlayerBody();
   $('#opname').innerHTML = 'OPERATOR <b>'+player.op.name+'</b>';
 }
 
@@ -427,13 +430,23 @@ function updatePlayer(dt){
   );
   if(wish.lengthSq()>0) wish.normalize();
 
-  var accel = player.onGround? 46 : 9;
-  player.vel.x = damp(player.vel.x, wish.x*speed, accel*0.34, dt);
-  player.vel.z = damp(player.vel.z, wish.z*speed, accel*0.34, dt);
+  /* Separate accelerate and brake rates: you reach top speed quickly but stop
+     even quicker, which is what makes strafing feel sharp instead of skated.
+     In the air the rate stays low, so a jump commits you to your arc but still
+     allows a little steering. */
+  var accel = player.onGround ? (moving? 21 : 27) : 3.4;
+  player.vel.x = damp(player.vel.x, wish.x*speed, accel, dt);
+  player.vel.z = damp(player.vel.z, wish.z*speed, accel, dt);
 
-  // jump / gravity
-  if((keys['Space']) && player.onGround){
+  /* Jump forgiveness — coyote time lets you jump just after walking off an
+     edge, and a buffered press fires the moment you land instead of being
+     swallowed. Both are invisible when you get the timing right and rescue the
+     jump when you don't. */
+  player.coyoteT = player.onGround ? 0.12 : Math.max(0, player.coyoteT-dt);
+  player.jumpBufT = keys['Space'] ? 0.15 : Math.max(0, player.jumpBufT-dt);
+  if(player.jumpBufT>0 && player.coyoteT>0){
     player.vel.y = 7.4; player.onGround=false;
+    player.coyoteT = 0; player.jumpBufT = 0;
     noise(0.06,0.06,'lowpass',400,1,0,0.06);
   }
   player.vel.y -= GRAV*dt;
@@ -444,15 +457,29 @@ function updatePlayer(dt){
 
   collide(player.pos, P_RAD);
   var gh = groundAt(player.pos.x, player.pos.z);
+  var wasAir = !player.onGround;
   if(player.pos.y <= gh){
-    if(!player.onGround && player.vel.y<-9) noise(0.08,0.10,'lowpass',300,1,0,0.08);
+    if(wasAir && player.vel.y<-3){
+      // compress the view on landing, hard drops harder
+      player.landDip = Math.min(0.085, player.landDip + (-player.vel.y)*0.0055);
+      if(player.vel.y<-9) noise(0.08,0.10,'lowpass',300,1,0,0.08);
+    }
     player.pos.y = gh; player.vel.y=0; player.onGround=true;
   } else player.onGround = (player.pos.y<=gh+0.02);
 
-  // head bob
+  // head bob — amplitude reads straight off current speed, so it is exactly
+  // zero at a standstill and never leaves a residue on the camera
   var hspd = Math.sqrt(player.vel.x*player.vel.x+player.vel.z*player.vel.z);
   if(player.onGround) vm.bob += dt*hspd*1.35;
+  player.bobAmp = player.onGround ? clamp(hspd/(5.6*player.op.speed),0,1.35) : 0;
+  player.bobPhase += dt*hspd*1.35;
+  player.walkPhase = player.bobPhase;
   vm.sprintT = damp(vm.sprintT, player.sprint?1:0, 11, dt);
+
+  // strafe lean — roll the view slightly into the direction you are sliding
+  var leanT = -fx2*(player.ads?0.34:1)*0.022;
+  player.lean = damp(player.lean, leanT, 7, dt);
+  player.landDip = damp(player.landDip, 0, 9, dt);
 
   // height / crouch
   var targetH = player.crouch? EYE_CROUCH : EYE;
@@ -465,10 +492,13 @@ function updatePlayer(dt){
   // firing
   tryFire(dt);
 
-  // health regen
+  /* Health regen. The rate is a fraction of the pool rather than a flat number,
+     so a bigger operator does not mean a longer wait staring at a wall — every
+     operator takes about the same time to top up. The delay is what makes a
+     fight dangerous; the rate is only what makes the next one possible. */
   player.regenT += dt;
-  if(player.regenT>4.2 && player.hp<player.maxHp){
-    player.hp = Math.min(player.maxHp, player.hp + 26*dt);
+  if(player.regenT>3.2 && player.hp<player.maxHp){
+    player.hp = Math.min(player.maxHp, player.hp + player.maxHp*0.30*dt);
     updateHealthHud();
   }
 }
@@ -480,16 +510,28 @@ function applyCamera(dt){
   player.recoilYaw   = damp(player.recoilYaw, 0, w.recover*0.85, dt);
   player.shake = damp(player.shake, 0, 6, dt);
 
-  camera.position.set(player.pos.x, player.pos.y + player.height, player.pos.z);
+  /* Bob, lean and the landing dip are camera-only. Roll happens about the view
+     axis and the offsets are translations, so the forward vector — and with it
+     every shot fired this frame — is exactly where the crosshair points. */
+  var vb = player.alive ? settings.viewBob : 0;
+  var bobUp = 0, bobSide = 0;
+  if(vb>0){
+    bobUp   = Math.abs(Math.cos(player.bobPhase))*0.019*player.bobAmp*vb;
+    bobSide = Math.sin(player.bobPhase)*0.026*player.bobAmp*vb;
+  }
+  var yaw = player.yaw + player.recoilYaw;
+  camera.position.set(player.pos.x, player.pos.y + player.height + bobUp - player.landDip, player.pos.z);
+  camera.position.x += Math.cos(yaw)*bobSide;
+  camera.position.z += -Math.sin(yaw)*bobSide;
   if(player.shake>0.01){
     camera.position.x += rnd(-1,1)*player.shake*0.055;
     camera.position.y += rnd(-1,1)*player.shake*0.055;
     camera.position.z += rnd(-1,1)*player.shake*0.055;
   }
   var pitch = player.pitch + player.recoilPitch;
-  var yaw = player.yaw + player.recoilYaw;
+  var roll = vb>0 ? player.lean + Math.sin(player.bobPhase)*0.006*player.bobAmp*vb : player.lean;
   camera.rotation.order = 'YXZ';
-  camera.rotation.set(clamp(pitch,-1.54,1.54), yaw, 0);
+  camera.rotation.set(clamp(pitch,-1.54,1.54), yaw, roll);
   if(!player.alive && player.killer && player.killer.alive){
     // look toward killer while dead
     TMP.copy(player.killer.pos).setY(player.killer.pos.y+1.4).sub(camera.position);
@@ -503,7 +545,7 @@ function applyCamera(dt){
   if(player.sprint) targetFov += 5*vm.sprintT;
   camera.fov = damp(camera.fov, targetFov, 14, dt);
   camera.updateProjectionMatrix();
-  gunCam.fov = damp(gunCam.fov, lerp(70, 55, player.adsAmt), 14, dt);
+  gunCam.fov = damp(gunCam.fov, lerp(VM_FOV_HIP, VM_FOV_ADS, player.adsAmt), 14, dt);
   gunCam.updateProjectionMatrix();
 }
 

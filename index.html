@@ -380,6 +380,8 @@ kbd{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);padd
         <div class="setrow"><label class="up">ADS sensitivity</label><input type="range" id="sAds" min="20" max="150" value="70"><div class="v" id="vAds">0.70</div></div>
         <div class="setrow"><label class="up">Field of view</label><input type="range" id="sFov" min="65" max="115" value="85"><div class="v" id="vFov">85</div></div>
         <div class="setrow"><label class="up">Invert Y</label><input type="checkbox" id="sInv"></div>
+        <div class="setrow"><label class="up">View bob</label><input type="range" id="sBob" min="0" max="150" step="5" value="100"><div class="v" id="vBob">100</div></div>
+        <div class="setrow"><label class="up">Show own body</label><input type="checkbox" id="sBody" checked></div>
         <div class="ph">MATCH</div>
         <div class="setrow"><label class="up">Bot difficulty</label>
           <select id="sDiff"><option value="0">RECRUIT</option><option value="1" selected>REGULAR</option><option value="2">HARDENED</option><option value="3">VETERAN</option></select></div>
@@ -443,18 +445,27 @@ var TEAM_NAME = ['TASK FORCE 141','SPETSNAZ'];
 var settings = {
   sens: 1.20, adsSens: 0.70, fov: 85, invert:false,
   diff: 1, scoreLimit: 50, timeLimit: 10,
-  vol: 0.55, shadows: true, scale: 1.0, quality: 2
+  vol: 0.55, shadows: true, scale: 1.0, quality: 2,
+  viewBob: 1.0,        // 0 disables camera bob/lean entirely
+  showBody: true       // draw your own legs and torso in first person
 };
 
 // progression lives in memory for the page session
 var profile = { xp: 0, level: 1, primary:'m4', secondary:'m9', operator:'ghost' };
 function xpForLevel(l){ return Math.round(700*l + 90*l*l); }   // xp needed to go l -> l+1
 
+/* Five rifles converge on one target, so what kills you is not any single bot
+   but the stacked damage of the squad — measured at ~32 incoming DPS on
+   REGULAR, spiking past 65 when three of them focus at once. Against that,
+   health alone is a losing lever: it buys HP/DPS seconds and nothing more, and
+   the pool needed for a fair fight would make you a sponge. Damage and
+   accuracy are cut alongside the bigger health pool so a firefight lasts long
+   enough to be a firefight, while a careless push still gets you killed. */
 var DIFF = [
-  { name:'RECRUIT',  react:[0.60,1.05], spread:3.4, dmg:0.42, aggro:0.7, burst:[2,4], acc:0.42, rof:1.35 },
-  { name:'REGULAR',  react:[0.34,0.66], spread:2.2, dmg:0.60, aggro:0.9, burst:[3,6], acc:0.60, rof:1.18 },
-  { name:'HARDENED', react:[0.22,0.44], spread:1.5, dmg:0.76, aggro:1.0, burst:[4,8], acc:0.74, rof:1.08 },
-  { name:'VETERAN',  react:[0.13,0.28], spread:1.0, dmg:0.95, aggro:1.15,burst:[6,12],acc:0.88, rof:1.0 }
+  { name:'RECRUIT',  react:[0.60,1.05], spread:3.4, dmg:0.30, aggro:0.7, burst:[2,4], acc:0.34, rof:1.35 },
+  { name:'REGULAR',  react:[0.34,0.66], spread:2.2, dmg:0.40, aggro:0.9, burst:[3,6], acc:0.50, rof:1.18 },
+  { name:'HARDENED', react:[0.22,0.44], spread:1.5, dmg:0.58, aggro:1.0, burst:[4,8], acc:0.66, rof:1.08 },
+  { name:'VETERAN',  react:[0.13,0.28], spread:1.0, dmg:0.80, aggro:1.15,burst:[6,12],acc:0.84, rof:1.0 }
 ];
 
 /* --------------------------------- math ---------------------------------- */
@@ -1068,18 +1079,23 @@ var WEAPONS = {
 var PRIMARIES = ['m4','mp5','r870','scar','inter','m249'];
 var SECONDARIES = ['m9','deagle'];
 
+/* Health is the player's alone — bots are pinned to 100 HP in createBot, so
+   these numbers never buff the enemy. Five rifles firing at one target kills a
+   100 HP operator faster than you can break line of sight, which reads as
+   dying without ever getting to play; the pool below is set so a caught-out
+   push costs you most of a bar instead of the round. */
 var OPERATORS = {
-  ghost:  { name:'GHOST',  lvl:1,  hp:100, speed:1.00, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
+  ghost:  { name:'GHOST',  lvl:1,  hp:170, speed:1.00, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
             col:0x2f3a46, perk:'Balanced kit — no weakness, no crutch.' },
-  reaper: { name:'REAPER', lvl:2,  hp:130, speed:0.94, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
-            col:0x3d2f2f, perk:'+30 max health. Trades a step of speed for survivability.' },
-  viper:  { name:'VIPER',  lvl:3,  hp:95,  speed:1.14, reloadMul:1.00, adsMul:0.75, dmgMul:1.00, stealth:1.00,
+  reaper: { name:'REAPER', lvl:2,  hp:220, speed:0.94, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
+            col:0x3d2f2f, perk:'+50 max health. Trades a step of speed for survivability.' },
+  viper:  { name:'VIPER',  lvl:3,  hp:160, speed:1.14, reloadMul:1.00, adsMul:0.75, dmgMul:1.00, stealth:1.00,
             col:0x2b3a2c, perk:'+14% movement, 25% faster ADS. Wins the first shot.' },
-  havoc:  { name:'HAVOC',  lvl:5,  hp:105, speed:0.98, reloadMul:1.25, adsMul:1.10, dmgMul:1.16, stealth:1.00,
+  havoc:  { name:'HAVOC',  lvl:5,  hp:178, speed:0.98, reloadMul:1.25, adsMul:1.10, dmgMul:1.16, stealth:1.00,
             col:0x40332a, perk:'+16% weapon damage, slower reloads. Make the mag count.' },
-  nomad:  { name:'NOMAD',  lvl:7,  hp:110, speed:1.04, reloadMul:0.62, adsMul:0.9,  dmgMul:1.00, stealth:1.00,
+  nomad:  { name:'NOMAD',  lvl:7,  hp:186, speed:1.04, reloadMul:0.62, adsMul:0.9,  dmgMul:1.00, stealth:1.00,
             col:0x2a3640, perk:'38% faster reloads, +50% reserve ammo. Never dry.' },
-  spectre:{ name:'SPECTRE',lvl:10, hp:100, speed:1.10, reloadMul:0.85, adsMul:0.85, dmgMul:1.05, stealth:1.75,
+  spectre:{ name:'SPECTRE',lvl:10, hp:170, speed:1.10, reloadMul:0.85, adsMul:0.85, dmgMul:1.05, stealth:1.75,
             col:0x1d2126, perk:'Enemies take far longer to spot you. Slips lanes unseen.' }
 };
 
@@ -1138,6 +1154,36 @@ var vm = {
 };
 var muzzleFlash, muzzleLight, scopeOverlay;
 
+/* --------------------------- ads sight picture ---------------------------
+   These weapons carry solid blocks for sights, not an aperture you can look
+   through, so aiming down them used to park the receiver squarely over the
+   crosshair — you lost the target at the exact moment you aimed at it.
+   The sight picture is therefore "look over the top": at full ADS the gun is
+   dropped until its highest corner sits just BELOW the centre of the screen.
+   The drop is solved from the weapon's own parts list rather than hand-tuned,
+   so every gun — and any gun added later — clears the crosshair by itself.
+-------------------------------------------------------------------------- */
+var VM_FOV_HIP = 70, VM_FOV_ADS = 64;   // gun-camera fov; ADS no longer zooms
+var ADS_TOP_NDC = -0.055;               // where the top of the gun lands, in NDC
+var _adsPos = {};
+function adsPosFor(id){
+  if(_adsPos[id]) return _adsPos[id];
+  var w = WEAPONS[id], s = vm.group.scale.y || 0.5, z = vm.adsPos.z;
+  var tanHalf = Math.tan(VM_FOV_ADS*Math.PI/360);
+  var y = Infinity;
+  for(var i=0;i<w.parts.length;i++){
+    var p = w.parts[i];
+    // the near-top corner of each box projects highest, so it sets the limit
+    var zView = z + (p[5]+p[2]*0.5)*s;
+    if(zView > -0.02) continue;                       // at or behind the eye
+    var need = ADS_TOP_NDC*(-zView)*tanHalf - (p[4]+p[1]*0.5)*s;
+    if(need < y) y = need;
+  }
+  if(!isFinite(y)) y = vm.adsPos.y;                   // melee has no parts
+  _adsPos[id] = new THREE.Vector3(vm.adsPos.x, y, z);
+  return _adsPos[id];
+}
+
 function initViewmodel(){
   vm.group.scale.setScalar(0.50);
   gunScene.add(vm.group);
@@ -1187,7 +1233,7 @@ function updateViewmodel(dt){
   var w = WEAPONS[player.weapon];
   var adsF = player.adsAmt;
   // target position
-  var tp = TMP.copy(vm.basePos).lerp(vm.adsPos, adsF);
+  var tp = TMP.copy(vm.basePos).lerp(adsPosFor(player.weapon), adsF);
   // sprint offset
   var sp = clamp(vm.sprintT,0,1);
   tp.x += 0.07*sp; tp.y -= 0.045*sp; tp.z += 0.03*sp;
@@ -1439,7 +1485,9 @@ var player = {
   grenades:2, nadeT:0,
   streaksReady:{}, streaksUsed:{},
   hitParts:[], op:OPERATORS.ghost,
-  shake:0, xpThisMatch:0, damageDealt:0, killer:null, respawnT:0
+  shake:0, xpThisMatch:0, damageDealt:0, killer:null, respawnT:0,
+  // motion feel: bob phase, landing compression, strafe lean, jump forgiveness
+  bobPhase:0, bobAmp:0, landDip:0, lean:0, coyoteT:0, jumpBufT:0, walkPhase:0
 };
 var actors = [player];
 
@@ -1601,6 +1649,7 @@ function resetLoadout(){
   for(var k in vm.models) vm.group.remove(vm.models[k]);
   vm.models = {};
   setViewWeapon(player.weapon);
+  tintPlayerBody();
   $('#opname').innerHTML = 'OPERATOR <b>'+player.op.name+'</b>';
 }
 
@@ -1851,13 +1900,23 @@ function updatePlayer(dt){
   );
   if(wish.lengthSq()>0) wish.normalize();
 
-  var accel = player.onGround? 46 : 9;
-  player.vel.x = damp(player.vel.x, wish.x*speed, accel*0.34, dt);
-  player.vel.z = damp(player.vel.z, wish.z*speed, accel*0.34, dt);
+  /* Separate accelerate and brake rates: you reach top speed quickly but stop
+     even quicker, which is what makes strafing feel sharp instead of skated.
+     In the air the rate stays low, so a jump commits you to your arc but still
+     allows a little steering. */
+  var accel = player.onGround ? (moving? 21 : 27) : 3.4;
+  player.vel.x = damp(player.vel.x, wish.x*speed, accel, dt);
+  player.vel.z = damp(player.vel.z, wish.z*speed, accel, dt);
 
-  // jump / gravity
-  if((keys['Space']) && player.onGround){
+  /* Jump forgiveness — coyote time lets you jump just after walking off an
+     edge, and a buffered press fires the moment you land instead of being
+     swallowed. Both are invisible when you get the timing right and rescue the
+     jump when you don't. */
+  player.coyoteT = player.onGround ? 0.12 : Math.max(0, player.coyoteT-dt);
+  player.jumpBufT = keys['Space'] ? 0.15 : Math.max(0, player.jumpBufT-dt);
+  if(player.jumpBufT>0 && player.coyoteT>0){
     player.vel.y = 7.4; player.onGround=false;
+    player.coyoteT = 0; player.jumpBufT = 0;
     noise(0.06,0.06,'lowpass',400,1,0,0.06);
   }
   player.vel.y -= GRAV*dt;
@@ -1868,15 +1927,29 @@ function updatePlayer(dt){
 
   collide(player.pos, P_RAD);
   var gh = groundAt(player.pos.x, player.pos.z);
+  var wasAir = !player.onGround;
   if(player.pos.y <= gh){
-    if(!player.onGround && player.vel.y<-9) noise(0.08,0.10,'lowpass',300,1,0,0.08);
+    if(wasAir && player.vel.y<-3){
+      // compress the view on landing, hard drops harder
+      player.landDip = Math.min(0.085, player.landDip + (-player.vel.y)*0.0055);
+      if(player.vel.y<-9) noise(0.08,0.10,'lowpass',300,1,0,0.08);
+    }
     player.pos.y = gh; player.vel.y=0; player.onGround=true;
   } else player.onGround = (player.pos.y<=gh+0.02);
 
-  // head bob
+  // head bob — amplitude reads straight off current speed, so it is exactly
+  // zero at a standstill and never leaves a residue on the camera
   var hspd = Math.sqrt(player.vel.x*player.vel.x+player.vel.z*player.vel.z);
   if(player.onGround) vm.bob += dt*hspd*1.35;
+  player.bobAmp = player.onGround ? clamp(hspd/(5.6*player.op.speed),0,1.35) : 0;
+  player.bobPhase += dt*hspd*1.35;
+  player.walkPhase = player.bobPhase;
   vm.sprintT = damp(vm.sprintT, player.sprint?1:0, 11, dt);
+
+  // strafe lean — roll the view slightly into the direction you are sliding
+  var leanT = -fx2*(player.ads?0.34:1)*0.022;
+  player.lean = damp(player.lean, leanT, 7, dt);
+  player.landDip = damp(player.landDip, 0, 9, dt);
 
   // height / crouch
   var targetH = player.crouch? EYE_CROUCH : EYE;
@@ -1889,10 +1962,13 @@ function updatePlayer(dt){
   // firing
   tryFire(dt);
 
-  // health regen
+  /* Health regen. The rate is a fraction of the pool rather than a flat number,
+     so a bigger operator does not mean a longer wait staring at a wall — every
+     operator takes about the same time to top up. The delay is what makes a
+     fight dangerous; the rate is only what makes the next one possible. */
   player.regenT += dt;
-  if(player.regenT>4.2 && player.hp<player.maxHp){
-    player.hp = Math.min(player.maxHp, player.hp + 26*dt);
+  if(player.regenT>3.2 && player.hp<player.maxHp){
+    player.hp = Math.min(player.maxHp, player.hp + player.maxHp*0.30*dt);
     updateHealthHud();
   }
 }
@@ -1904,16 +1980,28 @@ function applyCamera(dt){
   player.recoilYaw   = damp(player.recoilYaw, 0, w.recover*0.85, dt);
   player.shake = damp(player.shake, 0, 6, dt);
 
-  camera.position.set(player.pos.x, player.pos.y + player.height, player.pos.z);
+  /* Bob, lean and the landing dip are camera-only. Roll happens about the view
+     axis and the offsets are translations, so the forward vector — and with it
+     every shot fired this frame — is exactly where the crosshair points. */
+  var vb = player.alive ? settings.viewBob : 0;
+  var bobUp = 0, bobSide = 0;
+  if(vb>0){
+    bobUp   = Math.abs(Math.cos(player.bobPhase))*0.019*player.bobAmp*vb;
+    bobSide = Math.sin(player.bobPhase)*0.026*player.bobAmp*vb;
+  }
+  var yaw = player.yaw + player.recoilYaw;
+  camera.position.set(player.pos.x, player.pos.y + player.height + bobUp - player.landDip, player.pos.z);
+  camera.position.x += Math.cos(yaw)*bobSide;
+  camera.position.z += -Math.sin(yaw)*bobSide;
   if(player.shake>0.01){
     camera.position.x += rnd(-1,1)*player.shake*0.055;
     camera.position.y += rnd(-1,1)*player.shake*0.055;
     camera.position.z += rnd(-1,1)*player.shake*0.055;
   }
   var pitch = player.pitch + player.recoilPitch;
-  var yaw = player.yaw + player.recoilYaw;
+  var roll = vb>0 ? player.lean + Math.sin(player.bobPhase)*0.006*player.bobAmp*vb : player.lean;
   camera.rotation.order = 'YXZ';
-  camera.rotation.set(clamp(pitch,-1.54,1.54), yaw, 0);
+  camera.rotation.set(clamp(pitch,-1.54,1.54), yaw, roll);
   if(!player.alive && player.killer && player.killer.alive){
     // look toward killer while dead
     TMP.copy(player.killer.pos).setY(player.killer.pos.y+1.4).sub(camera.position);
@@ -1927,7 +2015,7 @@ function applyCamera(dt){
   if(player.sprint) targetFov += 5*vm.sprintT;
   camera.fov = damp(camera.fov, targetFov, 14, dt);
   camera.updateProjectionMatrix();
-  gunCam.fov = damp(gunCam.fov, lerp(70, 55, player.adsAmt), 14, dt);
+  gunCam.fov = damp(gunCam.fov, lerp(VM_FOV_HIP, VM_FOV_ADS, player.adsAmt), 14, dt);
   gunCam.updateProjectionMatrix();
 }
 
@@ -2035,6 +2123,78 @@ function buildSoldier(team, weaponId){
                parts.legL, parts.legR, parts.armL, parts.armR, parts.shoL, parts.shoR];
   g.userData.parts = parts;
   return { group:g, parts:parts };
+}
+
+/* --------------------------- first-person body ---------------------------
+   Your own legs and torso, drawn in the world scene so they take real light
+   and cast a real shadow. Everything from the neck up is left off: the camera
+   sits where the head would be, and the arms belong to the viewmodel, which
+   renders over this on a cleared depth buffer. Nothing here is ever added to
+   `shootables`, so your own body can never block or absorb your own bullets.
+-------------------------------------------------------------------------- */
+var pbody = null;
+function buildPlayerBody(){
+  var g = new THREE.Group();
+  var uni = 0x3d4c3b, uni2 = 0x2d382f;
+  var parts = {};
+  function piece(geo,w,h,d,x,y,z,mat){
+    var m = new THREE.Mesh(geo, mat);
+    m.scale.set(w,h,d); m.position.set(x,y,z);
+    m.castShadow=true; m.receiveShadow=true;
+    g.add(m); return m;
+  }
+  /* This is not the soldier silhouette with the head sawn off. A full chest
+     sits directly under the chin and, looked down at, becomes a wall that hides
+     the legs behind it. So the chest is cut down and set back from the eye,
+     and the shoulders are left to the viewmodel arms — what remains is what you
+     would actually see of yourself: chest, hips, thighs, boots. */
+  /* Waist-down, and deliberately so. A chest modelled up to the collarbone ends
+     up 35 cm from the eye, where an 85-degree lens turns it into a featureless
+     slab that fills the screen and hides the legs behind it. Cutting the body
+     at the belt puts the nearest surface 60 cm away, which reads as a body
+     instead of a wall and leaves the thighs and boots in clear view. The gap
+     above the belt is exactly where the viewmodel's arms and weapon sit, so
+     nothing looks missing.
+     -z is forward, so the legs are set slightly ahead of the hips to keep them
+     from being occluded when you look straight down. */
+  parts.legL = piece(_limbGeo, 0.20,0.86,0.20, -0.115,0.86,-0.11, amat(uni2));
+  parts.legR = piece(_limbGeo, 0.20,0.86,0.20,  0.115,0.86,-0.11, amat(uni2));
+  parts.hips = piece(_cylGeo,  0.38,0.24,0.24, 0,0.90,0.08, amat(uni2));
+  // own material instance — the operator tint must not leak onto the bots
+  parts.vestMat = new THREE.MeshPhongMaterial({ color:0x28323c, shininess:16, specular:0x1a1c1e });
+  parts.belt = piece(_boxGeo, 0.40,0.09,0.26, 0,1.00,0.08, parts.vestMat);
+  parts.pouch= piece(_boxGeo, 0.20,0.09,0.10, 0,0.94,-0.20, amat(uni2,14));
+  g.visible = false;
+  scene.add(g);
+  pbody = { group:g, parts:parts };
+  tintPlayerBody();
+}
+function tintPlayerBody(){
+  if(!pbody) return;
+  var op = OPERATORS[profile.operator] || OPERATORS.ghost;
+  pbody.parts.vestMat.color.setHex(op.col);
+}
+function updatePlayerBody(dt){
+  if(!pbody) return;
+  var show = settings.showBody && player.alive && state.phase==='play';
+  pbody.group.visible = show;
+  if(!show) return;
+  var P = pbody.parts, g = pbody.group;
+  g.position.set(player.pos.x, player.pos.y, player.pos.z);
+  g.rotation.y = player.yaw;
+  // The body compresses with the eye, crouch and landing dip alike, so the
+  // camera keeps the same clearance over the shoulders however far it drops —
+  // and the legs visibly absorb a landing instead of the view sinking through
+  // a body that stayed rigid.
+  g.scale.y = (player.height - player.landDip)/EYE;
+
+  var sw = Math.sin(player.walkPhase)*clamp(player.bobAmp,0,1);
+  P.legL.rotation.x = damp(P.legL.rotation.x,  sw*0.55, 18, dt);
+  P.legR.rotation.x = damp(P.legR.rotation.x, -sw*0.55, 18, dt);
+  // hips tip forward into a sprint and rock a little with each stride
+  var hipTip = vm.sprintT*0.13 + Math.cos(player.walkPhase)*0.04*clamp(player.bobAmp,0,1);
+  P.hips.rotation.x = damp(P.hips.rotation.x, hipTip, 12, dt);
+  P.belt.rotation.x = P.hips.rotation.x;
 }
 
 var botIdSeq = 0;
@@ -2880,7 +3040,7 @@ function operatorCard(id){
     '<div class="nm">'+o.name+'</div><div class="ty">OPERATOR</div>'+
     (unlocked? (sel?'<div class="selmark up">SELECTED</div>':'') : '<div class="lk up">LVL '+o.lvl+'</div>')+
     '<div class="ds">'+o.perk+'</div>'+
-    statBar('HP', o.hp*0.72) +
+    statBar('HP', o.hp*0.42) +
     statBar('SPEED', o.speed*62) +
     statBar('RELOAD', (2-o.reloadMul)*58) +
     statBar('ADS', (2-o.adsMul)*56) +
@@ -2933,7 +3093,9 @@ function initMenus(){
   bindRange('#sTime','#vTime',function(x){return x;},function(x){settings.timeLimit=x; buildMenus();});
   bindRange('#sVol','#vVol',function(x){return x;},function(x){settings.vol=x/100; if(masterGain) masterGain.gain.value=settings.vol;});
   bindRange('#sScale','#vScale',function(x){return x;},function(x){settings.scale=x/100; setPixelRatio();});
+  bindRange('#sBob','#vBob',function(x){return x;},function(x){settings.viewBob=x/100;});
   $('#sInv').addEventListener('change',function(){ settings.invert=this.checked; });
+  $('#sBody').addEventListener('change',function(){ settings.showBody=this.checked; });
   $('#sShadow').addEventListener('change',function(){ settings.shadows=this.checked; applyQuality(); });
   $('#sQual').addEventListener('change',function(){
     settings.quality=+this.value;
@@ -3078,6 +3240,7 @@ function simulate(dt){
   updateSentries(dt);
   updateDesignator();
   updateViewmodel(dt);
+  updatePlayerBody(dt);
   updateFx(dt);
 }
 
@@ -3122,10 +3285,12 @@ function loop(now){
     camera.lookAt(0, 2, 0);
     camera.fov = 62; camera.updateProjectionMatrix();
     updateFx(raw);
+    updatePlayerBody(raw);
   } else {
     accum = 0;
     updateFx(raw);
     updateViewmodel(raw);
+    updatePlayerBody(raw);
   }
 
   renderer.clear();
@@ -3147,6 +3312,7 @@ function init(){
   initMenus();
   buildStreakHud();
   createBots();
+  buildPlayerBody();
   resetLoadout();
   buildMenus();
   updateXpHud();
@@ -3157,6 +3323,8 @@ function init(){
                          profile:profile, startMatch:startMatch, WEAPONS:WEAPONS,
                          mouse:mouse, keys:keys, sentries:sentries, grenades:grenades,
                          hasLOS:hasLOS, chestOf:chestOf, vm:vm, gunCam:gunCam, camera:camera,
+                         adsPosFor:adsPosFor, VM_FOV_ADS:VM_FOV_ADS,
+                         playerBody:function(){ return pbody; },
                          eyeHeight:function(){return player.height;} };
 }
 

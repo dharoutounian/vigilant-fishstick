@@ -100,6 +100,7 @@ function simulate(dt){
   updateSentries(dt);
   updateDesignator();
   updateViewmodel(dt);
+  updatePlayerBody(dt);
   updateFx(dt);
 }
 
@@ -144,10 +145,12 @@ function loop(now){
     camera.lookAt(0, 2, 0);
     camera.fov = 62; camera.updateProjectionMatrix();
     updateFx(raw);
+    updatePlayerBody(raw);
   } else {
     accum = 0;
     updateFx(raw);
     updateViewmodel(raw);
+    updatePlayerBody(raw);
   }
 
   renderer.clear();
@@ -169,6 +172,7 @@ function init(){
   initMenus();
   buildStreakHud();
   createBots();
+  buildPlayerBody();
   resetLoadout();
   buildMenus();
   updateXpHud();
@@ -179,6 +183,8 @@ function init(){
                          profile:profile, startMatch:startMatch, WEAPONS:WEAPONS,
                          mouse:mouse, keys:keys, sentries:sentries, grenades:grenades,
                          hasLOS:hasLOS, chestOf:chestOf, vm:vm, gunCam:gunCam, camera:camera,
+                         adsPosFor:adsPosFor, VM_FOV_ADS:VM_FOV_ADS,
+                         playerBody:function(){ return pbody; },
                          eyeHeight:function(){return player.height;} };
 }
 

@@ -85,18 +85,23 @@ var WEAPONS = {
 var PRIMARIES = ['m4','mp5','r870','scar','inter','m249'];
 var SECONDARIES = ['m9','deagle'];
 
+/* Health is the player's alone — bots are pinned to 100 HP in createBot, so
+   these numbers never buff the enemy. Five rifles firing at one target kills a
+   100 HP operator faster than you can break line of sight, which reads as
+   dying without ever getting to play; the pool below is set so a caught-out
+   push costs you most of a bar instead of the round. */
 var OPERATORS = {
-  ghost:  { name:'GHOST',  lvl:1,  hp:100, speed:1.00, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
+  ghost:  { name:'GHOST',  lvl:1,  hp:170, speed:1.00, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
             col:0x2f3a46, perk:'Balanced kit — no weakness, no crutch.' },
-  reaper: { name:'REAPER', lvl:2,  hp:130, speed:0.94, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
-            col:0x3d2f2f, perk:'+30 max health. Trades a step of speed for survivability.' },
-  viper:  { name:'VIPER',  lvl:3,  hp:95,  speed:1.14, reloadMul:1.00, adsMul:0.75, dmgMul:1.00, stealth:1.00,
+  reaper: { name:'REAPER', lvl:2,  hp:220, speed:0.94, reloadMul:1.00, adsMul:1.00, dmgMul:1.00, stealth:1.00,
+            col:0x3d2f2f, perk:'+50 max health. Trades a step of speed for survivability.' },
+  viper:  { name:'VIPER',  lvl:3,  hp:160, speed:1.14, reloadMul:1.00, adsMul:0.75, dmgMul:1.00, stealth:1.00,
             col:0x2b3a2c, perk:'+14% movement, 25% faster ADS. Wins the first shot.' },
-  havoc:  { name:'HAVOC',  lvl:5,  hp:105, speed:0.98, reloadMul:1.25, adsMul:1.10, dmgMul:1.16, stealth:1.00,
+  havoc:  { name:'HAVOC',  lvl:5,  hp:178, speed:0.98, reloadMul:1.25, adsMul:1.10, dmgMul:1.16, stealth:1.00,
             col:0x40332a, perk:'+16% weapon damage, slower reloads. Make the mag count.' },
-  nomad:  { name:'NOMAD',  lvl:7,  hp:110, speed:1.04, reloadMul:0.62, adsMul:0.9,  dmgMul:1.00, stealth:1.00,
+  nomad:  { name:'NOMAD',  lvl:7,  hp:186, speed:1.04, reloadMul:0.62, adsMul:0.9,  dmgMul:1.00, stealth:1.00,
             col:0x2a3640, perk:'38% faster reloads, +50% reserve ammo. Never dry.' },
-  spectre:{ name:'SPECTRE',lvl:10, hp:100, speed:1.10, reloadMul:0.85, adsMul:0.85, dmgMul:1.05, stealth:1.75,
+  spectre:{ name:'SPECTRE',lvl:10, hp:170, speed:1.10, reloadMul:0.85, adsMul:0.85, dmgMul:1.05, stealth:1.75,
             col:0x1d2126, perk:'Enemies take far longer to spot you. Slips lanes unseen.' }
 };
 
@@ -155,6 +160,36 @@ var vm = {
 };
 var muzzleFlash, muzzleLight, scopeOverlay;
 
+/* --------------------------- ads sight picture ---------------------------
+   These weapons carry solid blocks for sights, not an aperture you can look
+   through, so aiming down them used to park the receiver squarely over the
+   crosshair — you lost the target at the exact moment you aimed at it.
+   The sight picture is therefore "look over the top": at full ADS the gun is
+   dropped until its highest corner sits just BELOW the centre of the screen.
+   The drop is solved from the weapon's own parts list rather than hand-tuned,
+   so every gun — and any gun added later — clears the crosshair by itself.
+-------------------------------------------------------------------------- */
+var VM_FOV_HIP = 70, VM_FOV_ADS = 64;   // gun-camera fov; ADS no longer zooms
+var ADS_TOP_NDC = -0.055;               // where the top of the gun lands, in NDC
+var _adsPos = {};
+function adsPosFor(id){
+  if(_adsPos[id]) return _adsPos[id];
+  var w = WEAPONS[id], s = vm.group.scale.y || 0.5, z = vm.adsPos.z;
+  var tanHalf = Math.tan(VM_FOV_ADS*Math.PI/360);
+  var y = Infinity;
+  for(var i=0;i<w.parts.length;i++){
+    var p = w.parts[i];
+    // the near-top corner of each box projects highest, so it sets the limit
+    var zView = z + (p[5]+p[2]*0.5)*s;
+    if(zView > -0.02) continue;                       // at or behind the eye
+    var need = ADS_TOP_NDC*(-zView)*tanHalf - (p[4]+p[1]*0.5)*s;
+    if(need < y) y = need;
+  }
+  if(!isFinite(y)) y = vm.adsPos.y;                   // melee has no parts
+  _adsPos[id] = new THREE.Vector3(vm.adsPos.x, y, z);
+  return _adsPos[id];
+}
+
 function initViewmodel(){
   vm.group.scale.setScalar(0.50);
   gunScene.add(vm.group);
@@ -204,7 +239,7 @@ function updateViewmodel(dt){
   var w = WEAPONS[player.weapon];
   var adsF = player.adsAmt;
   // target position
-  var tp = TMP.copy(vm.basePos).lerp(vm.adsPos, adsF);
+  var tp = TMP.copy(vm.basePos).lerp(adsPosFor(player.weapon), adsF);
   // sprint offset
   var sp = clamp(vm.sprintT,0,1);
   tp.x += 0.07*sp; tp.y -= 0.045*sp; tp.z += 0.03*sp;

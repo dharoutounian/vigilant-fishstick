@@ -30,7 +30,7 @@ function operatorCard(id){
     '<div class="nm">'+o.name+'</div><div class="ty">OPERATOR</div>'+
     (unlocked? (sel?'<div class="selmark up">SELECTED</div>':'') : '<div class="lk up">LVL '+o.lvl+'</div>')+
     '<div class="ds">'+o.perk+'</div>'+
-    statBar('HP', o.hp*0.72) +
+    statBar('HP', o.hp*0.42) +
     statBar('SPEED', o.speed*62) +
     statBar('RELOAD', (2-o.reloadMul)*58) +
     statBar('ADS', (2-o.adsMul)*56) +
@@ -83,7 +83,9 @@ function initMenus(){
   bindRange('#sTime','#vTime',function(x){return x;},function(x){settings.timeLimit=x; buildMenus();});
   bindRange('#sVol','#vVol',function(x){return x;},function(x){settings.vol=x/100; if(masterGain) masterGain.gain.value=settings.vol;});
   bindRange('#sScale','#vScale',function(x){return x;},function(x){settings.scale=x/100; setPixelRatio();});
+  bindRange('#sBob','#vBob',function(x){return x;},function(x){settings.viewBob=x/100;});
   $('#sInv').addEventListener('change',function(){ settings.invert=this.checked; });
+  $('#sBody').addEventListener('change',function(){ settings.showBody=this.checked; });
   $('#sShadow').addEventListener('change',function(){ settings.shadows=this.checked; applyQuality(); });
   $('#sQual').addEventListener('change',function(){
     settings.quality=+this.value;
