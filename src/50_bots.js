@@ -72,6 +72,78 @@ function buildSoldier(team, weaponId){
   return { group:g, parts:parts };
 }
 
+/* --------------------------- first-person body ---------------------------
+   Your own legs and torso, drawn in the world scene so they take real light
+   and cast a real shadow. Everything from the neck up is left off: the camera
+   sits where the head would be, and the arms belong to the viewmodel, which
+   renders over this on a cleared depth buffer. Nothing here is ever added to
+   `shootables`, so your own body can never block or absorb your own bullets.
+-------------------------------------------------------------------------- */
+var pbody = null;
+function buildPlayerBody(){
+  var g = new THREE.Group();
+  var uni = 0x3d4c3b, uni2 = 0x2d382f;
+  var parts = {};
+  function piece(geo,w,h,d,x,y,z,mat){
+    var m = new THREE.Mesh(geo, mat);
+    m.scale.set(w,h,d); m.position.set(x,y,z);
+    m.castShadow=true; m.receiveShadow=true;
+    g.add(m); return m;
+  }
+  /* This is not the soldier silhouette with the head sawn off. A full chest
+     sits directly under the chin and, looked down at, becomes a wall that hides
+     the legs behind it. So the chest is cut down and set back from the eye,
+     and the shoulders are left to the viewmodel arms — what remains is what you
+     would actually see of yourself: chest, hips, thighs, boots. */
+  /* Waist-down, and deliberately so. A chest modelled up to the collarbone ends
+     up 35 cm from the eye, where an 85-degree lens turns it into a featureless
+     slab that fills the screen and hides the legs behind it. Cutting the body
+     at the belt puts the nearest surface 60 cm away, which reads as a body
+     instead of a wall and leaves the thighs and boots in clear view. The gap
+     above the belt is exactly where the viewmodel's arms and weapon sit, so
+     nothing looks missing.
+     -z is forward, so the legs are set slightly ahead of the hips to keep them
+     from being occluded when you look straight down. */
+  parts.legL = piece(_limbGeo, 0.20,0.86,0.20, -0.115,0.86,-0.11, amat(uni2));
+  parts.legR = piece(_limbGeo, 0.20,0.86,0.20,  0.115,0.86,-0.11, amat(uni2));
+  parts.hips = piece(_cylGeo,  0.38,0.24,0.24, 0,0.90,0.08, amat(uni2));
+  // own material instance — the operator tint must not leak onto the bots
+  parts.vestMat = new THREE.MeshPhongMaterial({ color:0x28323c, shininess:16, specular:0x1a1c1e });
+  parts.belt = piece(_boxGeo, 0.40,0.09,0.26, 0,1.00,0.08, parts.vestMat);
+  parts.pouch= piece(_boxGeo, 0.20,0.09,0.10, 0,0.94,-0.20, amat(uni2,14));
+  g.visible = false;
+  scene.add(g);
+  pbody = { group:g, parts:parts };
+  tintPlayerBody();
+}
+function tintPlayerBody(){
+  if(!pbody) return;
+  var op = OPERATORS[profile.operator] || OPERATORS.ghost;
+  pbody.parts.vestMat.color.setHex(op.col);
+}
+function updatePlayerBody(dt){
+  if(!pbody) return;
+  var show = settings.showBody && player.alive && state.phase==='play';
+  pbody.group.visible = show;
+  if(!show) return;
+  var P = pbody.parts, g = pbody.group;
+  g.position.set(player.pos.x, player.pos.y, player.pos.z);
+  g.rotation.y = player.yaw;
+  // The body compresses with the eye, crouch and landing dip alike, so the
+  // camera keeps the same clearance over the shoulders however far it drops —
+  // and the legs visibly absorb a landing instead of the view sinking through
+  // a body that stayed rigid.
+  g.scale.y = (player.height - player.landDip)/EYE;
+
+  var sw = Math.sin(player.walkPhase)*clamp(player.bobAmp,0,1);
+  P.legL.rotation.x = damp(P.legL.rotation.x,  sw*0.55, 18, dt);
+  P.legR.rotation.x = damp(P.legR.rotation.x, -sw*0.55, 18, dt);
+  // hips tip forward into a sprint and rock a little with each stride
+  var hipTip = vm.sprintT*0.13 + Math.cos(player.walkPhase)*0.04*clamp(player.bobAmp,0,1);
+  P.hips.rotation.x = damp(P.hips.rotation.x, hipTip, 12, dt);
+  P.belt.rotation.x = P.hips.rotation.x;
+}
+
 var botIdSeq = 0;
 function createBot(team, idx){
   var wid = BOT_LOADOUTS[(idx + (team?5:0)) % BOT_LOADOUTS.length];
