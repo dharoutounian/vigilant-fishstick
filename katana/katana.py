@@ -472,6 +472,85 @@ def extended_positions():
 # ---- output ---------------------------------------------------------------------
 
 
+def _indexed_mesh(m):
+    """Vertices and triangles with manifold's seam duplicates merged, so the mesh is closed."""
+    mesh = m.to_mesh()
+    v = np.asarray(mesh.vert_properties)[:, :3]
+    t = np.asarray(mesh.tri_verts).astype(np.int64)
+    remap = np.arange(len(v))
+    if mesh.merge_from_vert is not None and len(mesh.merge_from_vert):
+        remap[np.asarray(mesh.merge_from_vert)] = np.asarray(mesh.merge_to_vert)
+    t = remap[t]
+    used, t = np.unique(t, return_inverse=True)
+    return v[used], t.reshape(-1, 3)
+
+
+def write_3mf(items, path, title):
+    """One-plate project for the slicer: items are (name, manifold, x, y) on a 250 mm bed."""
+    import zipfile
+
+    objects, build = [], []
+    for i, (name, m, x, y) in enumerate(items, 1):
+        v, t = _indexed_mesh(m)
+        verts = "".join(f'<vertex x="{a:.4f}" y="{b:.4f}" z="{c:.4f}"/>' for a, b, c in v)
+        tris = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in t)
+        objects.append(
+            f'<object id="{i}" type="model" name="{name}"><mesh><vertices>{verts}</vertices>'
+            f"<triangles>{tris}</triangles></mesh></object>"
+        )
+        build.append(f'<item objectid="{i}" transform="1 0 0 0 1 0 0 0 1 {x:.3f} {y:.3f} 0"/>')
+    model = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<model unit="millimeter" xml:lang="en-US" '
+        'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">'
+        f'<metadata name="Title">{title}</metadata>'
+        f"<resources>{''.join(objects)}</resources><build>{''.join(build)}</build></model>"
+    )
+    types = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>'
+        "</Types>"
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Target="/3D/3dmodel.model" Id="rel0" '
+        'Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'
+    )
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", types)
+        z.writestr("_rels/.rels", rels)
+        z.writestr("3D/3dmodel.model", model)
+
+
+# Where each part sits on the Kobra S1 bed (part centres, bed origin at the front-left corner).
+PLATE = {
+    "tsuba_guard": ("Guard (tsuba)", 50, 45),
+    "pommel_cap": ("Pommel cap", 40, 110),
+    "keeper_cap_optional": ("Keeper cap (optional)", 40, 150),
+    "pin": ("Pin", 40, 185),
+    "handle": ("Handle", 130, 60),
+    "blade_1_base": ("Blade 1 - base", 200, 60),
+    "blade_2_middle": ("Blade 2 - middle", 130, 160),
+    "blade_3_tip": ("Blade 3 - tip", 200, 160),
+}
+
+
+def plate_items(printed):
+    items = [(PLATE[n][0], m, PLATE[n][1], PLATE[n][2]) for n, m in printed.items()]
+    boxes = []
+    for name, m, x, y in items:
+        lo, hi = np.array(m.bounding_box()[:2]) + (x, y), np.array(m.bounding_box()[3:5]) + (x, y)
+        assert lo.min() >= 8 and hi.max() <= BED - 8, f"{name} is off the bed"
+        for other, olo, ohi in boxes:
+            gap = max(olo[0] - hi[0], lo[0] - ohi[0], olo[1] - hi[1], lo[1] - ohi[1])
+            assert gap >= 10, f"{name} is too close to {other} ({gap:.1f} mm)"
+        boxes.append((name, lo, hi))
+    return items
+
+
 def write_stl(m, path):
     mesh = m.to_mesh()
     v = np.asarray(mesh.vert_properties)[:, :3].astype(np.float64)
@@ -501,7 +580,9 @@ def print_parts(parts):
             m = bend(m)
         elif name == "keeper_cap_optional":
             m = m.rotate([180, 0, 0])  # closed end on the bed
-        out[name] = to_bed(m)
+        # Collapse slivers left by the booleans (moves nothing by more than 1 micron) so
+        # slicers that weld vertices still see a closed mesh.
+        out[name] = to_bed(m.simplify(1e-3))
     return out
 
 
@@ -595,12 +676,16 @@ def main():
     dims()
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    for name, m in print_parts(parts).items():
+    printed = print_parts(parts)
+    for name, m in printed.items():
         write_stl(m, out / f"{name}.stl")
-    fo, fi = fit_test()
-    write_stl(to_bed(fo), out / "fit_test_outer.stl")
-    write_stl(to_bed(fi), out / "fit_test_inner.stl")
+    fo, fi = (to_bed(m.simplify(1e-3)) for m in fit_test())
+    write_stl(fo, out / "fit_test_outer.stl")
+    write_stl(fi, out / "fit_test_inner.stl")
     print(f"wrote STLs to {out}")
+    write_3mf(plate_items(printed), HERE / "katana_kobra_s1.3mf", "Collapsible Katana")
+    write_3mf([("Fit test - outer", fo, 105, 125), ("Fit test - inner", fi, 145, 125)], HERE / "fit_test_kobra_s1.3mf", "Katana fit test")
+    print(f"wrote one-plate projects to {HERE}")
     if args.check and not check(parts):
         sys.exit(1)
 

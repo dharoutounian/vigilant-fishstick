@@ -29,8 +29,19 @@ Gold at the left: the pommel cap and its pin.*
 
 ## Files
 
-All files are in [`stl/`](stl/) and are already oriented the way they should print, so
-**don't rotate them**.
+**Easiest: open one file.** Both of these are ready-made plates for the Kobra S1:
+
+| File | What it is |
+|---|---|
+| [`fit_test_kobra_s1.3mf`](fit_test_kobra_s1.3mf) | The two fit-test pieces. **Print this first.** |
+| [`katana_kobra_s1.3mf`](katana_kobra_s1.3mf) | The whole sword, all 8 parts laid out on one plate |
+
+In Anycubic Slicer Next, choose **File → Import → Import 3MF/STL** (or drag the file
+onto the window). If it asks whether to load the file as a project, choose to load the
+**geometry only**, keep your Kobra S1 printer and filament profile, and press **Slice**.
+
+If you'd rather place parts yourself, the separate STL files are in [`stl/`](stl/).
+They're already oriented the way they should print, so **don't rotate them**.
 
 | File | What it is |
 |---|---|
