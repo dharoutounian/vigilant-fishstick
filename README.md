@@ -1,5 +1,10 @@
 # Operation Firestorm
 
+> This repository also holds **[Coinleaf](coinleaf/)**, a private budgeting and
+> expense-tracking app for iPhone, in the `coinleaf/` folder. See
+> [`coinleaf/README.md`](coinleaf/README.md) for how to build it and publish it to
+> the App Store.
+
 A 5v5 team-deathmatch FPS that runs in a browser tab. One HTML file, no install, no
 build step required to play, no network needed after you've got the file.
 
