@@ -5,6 +5,10 @@ build step required to play, no network needed after you've got the file.
 
 **▶ [Play it here](https://dharoutounian.github.io/vigilant-fishstick/)**
 
+Also in this repo: **[Lighthouse](lighthouse/)**, a 3D tower-defense game where your only weapon is
+a lighthouse beam and the things from the sea can only move in the dark.
+[Play it](https://dharoutounian.github.io/vigilant-fishstick/lighthouse/).
+
 ![Gameplay](docs/gameplay.jpg)
 
 ---

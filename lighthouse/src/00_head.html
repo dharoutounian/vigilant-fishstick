@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lighthouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* A keeper's night watch: lamplight amber on sea-ink, logbook type over a live 3D scene. */
+:root{
+  color-scheme: dark;
+  --ink:#05080d;          /* night sky, page ground */
+  --slate:rgba(9,16,24,.84);
+  --slate-solid:#0c1620;
+  --rule:rgba(255,214,140,.18);
+  --foam:#e3e9ea;         /* primary text */
+  --mist:#90a2ad;         /* secondary text */
+  --lamp:#ffd27a;         /* the light: accent */
+  --lamp-deep:#e9a94a;
+  --ember:#ff8a3d;
+  --blood:#e2553f;        /* damage */
+  --frost:#a9d8ff;        /* snuffers, cold */
+  --ok:#9fd08a;
+  --f-display:'IM Fell English SC','Iowan Old Style',Georgia,serif;
+  --f-log:'IM Fell English','Iowan Old Style',Georgia,serif;
+  --f-ui:'Alegreya Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--ink);color:var(--foam);
+  font-family:var(--f-ui);font-size:15px;-webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;touch-action:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.ico{width:1em;height:1em;vertical-align:-.12em;flex:none}
+
+/* ---------- shared pieces ---------- */
+.btn{appearance:none;border:1px solid var(--rule);background:rgba(255,210,122,.06);color:var(--foam);
+  padding:.55em 1.1em;border-radius:3px;cursor:pointer;font-weight:500;letter-spacing:.02em;
+  transition:background .15s,border-color .15s,color .15s}
+.btn:hover{background:rgba(255,210,122,.14);border-color:rgba(255,210,122,.45)}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.38;cursor:default;transform:none}
+.btn.primary{background:var(--lamp);color:#1a1206;border-color:var(--lamp);font-weight:700}
+.btn.primary:hover{background:#ffe0a0}
+.btn.ghost{background:none;border-color:transparent;color:var(--mist)}
+.btn.ghost:hover{color:var(--foam);background:rgba(255,255,255,.04)}
+.eyebrow{font-family:var(--f-ui);font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mist)}
+.log{font-family:var(--f-log);font-style:italic}
+.kbd{display:inline-block;min-width:1.5em;padding:0 .35em;border:1px solid rgba(227,233,234,.28);border-bottom-width:2px;
+  border-radius:3px;font-family:var(--f-ui);font-style:normal;font-size:.78em;line-height:1.45;text-align:center;color:var(--foam)}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none}
+#watch{position:absolute;top:calc(14px + var(--sat));left:calc(14px + var(--sal));
+  background:var(--slate);border:1px solid var(--rule);border-radius:4px;padding:10px 14px 12px;min-width:220px}
+#watch .row{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+#h-night{font-family:var(--f-display);font-size:1.45rem;line-height:1;color:var(--lamp)}
+#h-of{color:var(--mist);font-family:var(--f-display);font-size:1rem}
+#h-clock{font-family:var(--f-log);font-style:italic;font-size:1.05rem;color:var(--foam)}
+#track{position:relative;height:4px;margin-top:10px;background:rgba(255,255,255,.08);border-radius:2px}
+#track i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:2px;
+  background:linear-gradient(90deg,#3d5f86,#c98a5a 80%,var(--lamp))}
+#track b{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;
+  background:var(--foam);box-shadow:0 0 8px rgba(255,255,255,.6)}
+#watch .ends{display:flex;justify-content:space-between;margin-top:5px;font-size:.7rem;color:var(--mist);letter-spacing:.06em}
+
+#purse{position:absolute;top:calc(14px + var(--sat));right:calc(14px + var(--sar));display:flex;gap:8px}
+.chip{display:flex;align-items:center;gap:7px;background:var(--slate);border:1px solid var(--rule);border-radius:4px;
+  padding:7px 12px;font-weight:700;font-size:1.05rem}
+.chip small{font-weight:400;color:var(--mist);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase}
+#c-embers .ico{color:var(--ember)} #c-flares .ico{color:#ff6f5a}
+.chip.bump{animation:bump .35s}
+@keyframes bump{40%{transform:scale(1.12);border-color:var(--lamp)}}
+
+#bars{position:absolute;left:50%;bottom:calc(16px + var(--sab));transform:translateX(-50%);width:min(340px,58vw)}
+.bar-label{display:flex;justify-content:space-between;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mist);margin-bottom:4px}
+.bar-label b{color:var(--foam);letter-spacing:.04em;font-size:.85rem}
+.meter{position:relative;height:9px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
+.meter i{position:absolute;inset:0 auto 0 0;width:100%;background:linear-gradient(90deg,#b8463a,#e2553f 30%,#f0d6a0 100%);transition:width .12s}
+.meter.hit{animation:hit .4s}
+@keyframes hit{30%{border-color:var(--blood);box-shadow:0 0 14px rgba(226,85,63,.7)}}
+#heat{margin-top:7px;height:4px}
+#heat i{background:linear-gradient(90deg,var(--lamp),var(--ember),#ff4a2a);width:0}
+#heat.over i{background:#ff4a2a;animation:blink .25s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+#heat-row{display:flex;justify-content:space-between;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mist);margin-top:3px}
+#heat-row .warn{color:#ff8a6a}
+
+#acts{position:absolute;left:calc(14px + var(--sal));bottom:calc(16px + var(--sab));display:flex;gap:8px;pointer-events:auto}
+.act{appearance:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:64px;height:58px;
+  background:var(--slate);border:1px solid var(--rule);border-radius:5px;cursor:pointer;color:var(--foam);touch-action:none}
+.act svg{width:20px;height:20px}
+.act span{font-size:.72rem;letter-spacing:.05em}
+.act .kbd{font-size:.62rem;padding:0 .3em;min-width:0;border-width:1px;opacity:.7}
+.act.on{background:rgba(255,210,122,.22);border-color:var(--lamp)}
+.act[disabled]{opacity:.4}
+
+#radar{position:absolute;right:calc(14px + var(--sar));bottom:calc(14px + var(--sab));width:150px;height:150px;
+  border-radius:50%;background:rgba(6,11,17,.78);border:1px solid var(--rule)}
+
+#feed{position:absolute;left:50%;bottom:calc(84px + var(--sab));transform:translateX(-50%);width:min(560px,86vw);
+  display:flex;flex-direction:column;align-items:center;gap:4px}
+.entry{font-family:var(--f-log);font-style:italic;font-size:1.06rem;color:var(--foam);text-align:center;
+  text-shadow:0 1px 3px #000,0 0 12px rgba(0,0,0,.9);animation:entry 6s forwards;line-height:1.3}
+.entry em{font-style:normal;color:var(--mist);font-size:.82em;margin-right:.45em}
+.entry.tip{color:var(--lamp)}
+.entry.bad{color:#ff9a84}
+@keyframes entry{0%{opacity:0;transform:translateY(6px)}6%{opacity:1;transform:none}82%{opacity:1}100%{opacity:0}}
+
+#banner{position:absolute;left:0;right:0;top:24%;text-align:center;pointer-events:none;opacity:0}
+#banner.show{animation:banner 3.6s forwards}
+#banner h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(2.4rem,7vw,4.6rem);color:var(--lamp);
+  text-shadow:0 0 28px rgba(255,190,90,.45),0 2px 6px #000;letter-spacing:.04em}
+#banner p{margin:.3em 0 0;font-family:var(--f-log);font-style:italic;font-size:clamp(1rem,2.4vw,1.3rem);color:var(--foam);text-shadow:0 1px 4px #000}
+@keyframes banner{0%{opacity:0;transform:scale(.97)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0}}
+
+#vignette{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 rgba(226,85,63,0);transition:box-shadow .5s}
+#vignette.hurt{box-shadow:inset 0 0 160px 30px rgba(226,85,63,.32);transition:box-shadow .08s}
+#reticle{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border:1.5px solid rgba(255,210,122,.75);
+  border-radius:50%;pointer-events:none}
+#reticle::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px;background:var(--lamp);border-radius:50%}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;display:flex;padding:calc(24px + var(--sat)) max(16px,var(--sar)) calc(24px + var(--sab)) max(16px,var(--sal));
+  overflow:auto;pointer-events:auto}
+.sheet{background:var(--slate);border:1px solid var(--rule);border-radius:6px;padding:26px 28px;max-width:520px;width:100%;margin:auto;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.sheet h3{margin:0 0 .2em;font-family:var(--f-display);font-weight:400;font-size:2rem;color:var(--lamp);text-wrap:balance}
+.sheet p{color:var(--mist);line-height:1.5;margin:.4em 0 1em}
+.sheet .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+
+/* title */
+#menu{background:linear-gradient(90deg,rgba(5,8,13,.92) 0%,rgba(5,8,13,.72) 38%,rgba(5,8,13,0) 70%);align-items:center}
+#menu .inner{max-width:470px;margin-left:clamp(0px,5vw,72px);display:flex;flex-direction:column;gap:18px}
+#menu h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(3.2rem,10vw,6.4rem);line-height:.9;color:var(--lamp);
+  letter-spacing:.03em;text-shadow:0 0 40px rgba(255,190,90,.35)}
+#menu .sub{margin:0;font-family:var(--f-log);font-style:italic;font-size:1.22rem;color:var(--foam);line-height:1.4;max-width:30ch}
+.diffs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.diff{appearance:none;text-align:left;padding:10px 11px;border:1px solid var(--rule);background:rgba(9,16,24,.6);border-radius:4px;cursor:pointer;color:var(--foam)}
+.diff b{display:block;font-family:var(--f-display);font-weight:400;font-size:1.12rem}
+.diff span{display:block;font-size:.78rem;color:var(--mist);line-height:1.3;margin-top:3px}
+.diff[aria-pressed="true"]{border-color:var(--lamp);background:rgba(255,210,122,.12)}
+.diff[aria-pressed="true"] b{color:var(--lamp)}
+#menu .btns{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#menu .btn.primary{font-size:1.1rem;padding:.65em 1.6em}
+#menu .foot{font-size:.8rem;color:var(--mist);line-height:1.5}
+
+.controls{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:.92rem;align-items:baseline;margin:.6em 0 0}
+.controls dt{white-space:nowrap;text-align:right}
+.controls dd{margin:0;color:var(--mist)}
+.rules{margin:0 0 .4em;padding-left:1.1em;color:var(--foam);line-height:1.5}
+.rules li{margin:.25em 0}
+.rules b{color:var(--lamp);font-weight:500}
+
+.set-row{display:grid;grid-template-columns:9em 1fr;align-items:center;gap:12px;margin:12px 0}
+.set-row label{color:var(--mist)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{appearance:none;border:1px solid var(--rule);background:none;border-radius:3px;padding:.35em .8em;cursor:pointer;color:var(--foam)}
+.seg button[aria-pressed="true"]{border-color:var(--lamp);color:var(--lamp);background:rgba(255,210,122,.1)}
+input[type=range]{width:100%;accent-color:var(--lamp)}
+
+/* summary / end */
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 4px}
+.stats div{border-top:1px solid var(--rule);padding-top:8px}
+.stats b{display:block;font-family:var(--f-display);font-weight:400;font-size:1.7rem;color:var(--foam);font-variant-numeric:tabular-nums}
+.stats span{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mist)}
+
+/* ---------- workshop (day) ---------- */
+#shop{position:fixed;top:calc(14px + var(--sat));right:calc(14px + var(--sar));bottom:calc(14px + var(--sab));width:340px;
+  display:flex;flex-direction:column;background:var(--slate);border:1px solid var(--rule);border-radius:6px;pointer-events:auto;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#shop header{padding:16px 18px 12px;border-bottom:1px solid var(--rule)}
+#shop header h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:1.7rem;color:var(--lamp);line-height:1.05}
+#shop header p{margin:.35em 0 0;font-family:var(--f-log);font-style:italic;color:var(--foam);font-size:1rem;line-height:1.35}
+#shop .purse{display:flex;gap:16px;margin-top:10px;font-size:.92rem;color:var(--mist)}
+#shop .purse b{color:var(--foam);font-size:1.1rem}
+#shop .purse .ico{color:var(--ember)}
+#shop .scroll{flex:1;overflow:auto;padding:6px 18px 10px}
+#shop h4{margin:14px 0 6px;font-family:var(--f-ui);font-weight:500;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mist)}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;width:100%;text-align:left;padding:9px 10px;margin:0 0 6px;
+  border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.02);cursor:pointer;color:var(--foam)}
+.item:hover{background:rgba(255,210,122,.08);border-color:rgba(255,210,122,.4)}
+.item[aria-pressed="true"]{border-color:var(--lamp);background:rgba(255,210,122,.14)}
+.item[disabled]{opacity:.42;cursor:default}
+.item .nm{font-weight:700}
+.item .ds{grid-column:1;font-size:.82rem;color:var(--mist);line-height:1.3}
+.item .cost{grid-row:1/3;grid-column:2;display:flex;align-items:center;gap:4px;font-weight:700;font-variant-numeric:tabular-nums}
+.item .cost .ico{color:var(--ember)}
+.item .cost.max{color:var(--ok);font-weight:500;font-size:.85rem}
+.pips{display:inline-flex;gap:3px;margin-left:6px;vertical-align:1px}
+.pips i{width:7px;height:7px;border-radius:50%;border:1px solid rgba(255,210,122,.6)}
+.pips i.on{background:var(--lamp);border-color:var(--lamp)}
+#shop footer{padding:12px 18px 16px;border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:8px}
+#shop footer .btn.primary{width:100%;font-size:1.08rem;padding:.7em}
+#place-hint{font-size:.85rem;color:var(--lamp);min-height:1.2em;line-height:1.35}
+
+@media (max-width:720px){
+  html,body{font-size:14px}
+  #watch{min-width:0;padding:8px 10px 10px}
+  #h-night{font-size:1.2rem}
+  #radar{width:104px;height:104px}
+  #purse{gap:6px}
+  .chip{padding:6px 9px;font-size:.95rem}
+  .chip small{display:none}
+  #bars{top:calc(84px + var(--sat));bottom:auto;left:calc(14px + var(--sal));right:calc(14px + var(--sar));width:auto;transform:none}
+  #heat-row{margin-top:2px}
+  #feed{bottom:calc(84px + var(--sab));width:calc(100% - 140px);left:14px;transform:none;align-items:flex-start}
+  .entry{text-align:left;font-size:.98rem}
+  .act{width:54px;height:50px}
+  #menu{background:linear-gradient(180deg,rgba(5,8,13,.5),rgba(5,8,13,.92) 55%)}
+  #menu .inner{margin:auto 0 0}
+  #shop{left:max(10px,var(--sal));right:max(10px,var(--sar));top:auto;width:auto;max-height:56%}
+  .diffs{grid-template-columns:1fr}
+}
+@media (pointer:coarse){ .act .kbd{display:none} #menu-foot{display:none} }
+@media (prefers-reduced-motion:reduce){
+  .entry,#banner.show,.chip.bump,.meter.hit{animation-duration:.01s}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-ember" viewBox="0 0 20 20"><path fill="currentColor" d="M10 1.5c.6 3.2 4.8 5 4.8 9.6A4.8 4.8 0 0 1 10 16a4.8 4.8 0 0 1-4.8-4.9c0-2.4 1.4-3.7 2.3-4.8.2 1.4.8 2.4 1.7 2.9C9 6.6 9.2 3.8 10 1.5z"/><circle cx="10" cy="17.6" r="1.3" fill="currentColor" opacity=".6"/></symbol>
+  <symbol id="i-flare" viewBox="0 0 20 20"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M10 18V9M10 4.6v-2M5.2 6.2 3.8 4.8M14.8 6.2l1.4-1.4M4 10.2H2M18 10.2h-2"/><circle cx="10" cy="8.2" r="2.6" fill="currentColor"/></symbol>
+  <symbol id="i-focus" viewBox="0 0 20 20"><path fill="currentColor" d="M2 9.2 17.5 7v6L2 10.8z"/><circle cx="17.5" cy="10" r="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 20 20"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M1.8 10S5 4.5 10 4.5 18.2 10 18.2 10 15 15.5 10 15.5 1.8 10 1.8 10z"/><circle cx="10" cy="10" r="2.4" fill="currentColor"/></symbol>
+</svg>
+
+<canvas id="c" tabindex="0" aria-label="Lighthouse game view"></canvas>
+<div id="vignette"></div>
+<div id="reticle" hidden></div>
+
+<div id="hud" hidden>
+  <div id="watch">
+    <div class="row"><div><span id="h-night">Night 1</span> <span id="h-of">of 7</span></div><span id="h-clock" class="num">8:00 pm</span></div>
+    <div id="track"><i></i><b></b></div>
+    <div class="ends"><span>Dusk</span><span>Dawn</span></div>
+  </div>
+  <div id="purse">
+    <div class="chip" id="c-embers" title="Embers"><svg class="ico"><use href="#i-ember"/></svg><span class="num" id="h-embers">0</span><small>embers</small></div>
+    <div class="chip" id="c-flares" title="Flares"><svg class="ico"><use href="#i-flare"/></svg><span class="num" id="h-flares">0</span><small>flares</small></div>
+  </div>
+  <div id="feed" aria-live="polite"></div>
+  <div id="banner"><h2 id="banner-h"></h2><p id="banner-p"></p></div>
+  <div id="bars">
+    <div class="bar-label"><span>Lighthouse</span><b class="num" id="h-hp">100</b></div>
+    <div class="meter" id="hp"><i></i></div>
+    <div class="meter" id="heat"><i></i></div>
+    <div id="heat-row"><span>Lens heat</span><span id="heat-state"></span></div>
+  </div>
+  <div id="acts">
+    <button class="act" id="b-focus" type="button" aria-label="Focus the beam (hold)"><svg><use href="#i-focus"/></svg><span>Focus</span><span class="kbd">Space</span></button>
+    <button class="act" id="b-flare" type="button" aria-label="Throw a flare"><svg><use href="#i-flare"/></svg><span>Flare</span><span class="kbd">F</span></button>
+    <button class="act" id="b-view" type="button" aria-label="Switch view"><svg><use href="#i-eye"/></svg><span>View</span><span class="kbd">V</span></button>
+  </div>
+  <canvas id="radar" width="300" height="300" aria-hidden="true"></canvas>
+</div>
+
+<aside id="shop" hidden>
+  <header>
+    <div class="eyebrow" id="shop-eyebrow">Morning after night 1</div>
+    <h3 id="shop-title">The workshop</h3>
+    <p id="shop-note"></p>
+    <div class="purse"><span><svg class="ico"><use href="#i-ember"/></svg> <b class="num" id="s-embers">0</b> embers</span>
+      <span>Lighthouse <b class="num" id="s-hp">100</b></span></div>
+  </header>
+  <div class="scroll" id="shop-list"></div>
+  <footer>
+    <div id="place-hint"></div>
+    <button class="btn primary" id="b-dusk" type="button">Light the lamp</button>
+  </footer>
+</aside>
+
+<div id="menu" class="overlay">
+  <div class="inner">
+    <div class="eyebrow">A keeper's log, seven nights</div>
+    <h1>Lighthouse</h1>
+    <p class="sub">Things crawl out of the sea after dark. They can only move where your light is not.</p>
+    <div>
+      <div class="eyebrow" style="margin-bottom:8px">Weather</div>
+      <div class="diffs" id="diffs">
+        <button class="diff" type="button" data-d="0" aria-pressed="false"><b>Calm seas</b><span>Fewer of them, slower and softer.</span></button>
+        <button class="diff" type="button" data-d="1" aria-pressed="true"><b>Squall</b><span>The watch as it was meant to be kept.</span></button>
+        <button class="diff" type="button" data-d="2" aria-pressed="false"><b>Tempest</b><span>More, tougher, and hungrier.</span></button>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="b-start" type="button">Light the lamp</button>
+      <button class="btn" id="b-how" type="button">How to play</button>
+      <button class="btn ghost" id="b-settings" type="button">Settings</button>
+    </div>
+    <div class="foot" id="menu-foot">Mouse or touch to aim the beam. Best with sound on.</div>
+  </div>
+</div>
+
+<div id="how" class="overlay" hidden>
+  <div class="sheet">
+    <div class="eyebrow">Standing orders</div>
+    <h3>Keeping the light</h3>
+    <ul class="rules">
+      <li>Things come out of the sea and crawl toward the lighthouse. <b>They can only move in the dark.</b></li>
+      <li>Anything inside the beam freezes and slowly burns away. Focusing the beam narrows it and burns far hotter, until the lens overheats.</li>
+      <li>Rocks and the big ones cast <b>shadows</b>. Whatever hides in a shadow keeps moving.</li>
+      <li>Survive until dawn. Spend the embers you collect on lanterns, reflectors and better lamp parts.</li>
+    </ul>
+    <dl class="controls">
+      <dt><span class="kbd">Mouse</span></dt><dd>Aim the beam. It turns at the speed of its clockwork.</dd>
+      <dt><span class="kbd">Hold LMB</span> <span class="kbd">Space</span></dt><dd>Focus the beam</dd>
+      <dt><span class="kbd">RMB</span> <span class="kbd">F</span></dt><dd>Throw a flare where you aim</dd>
+      <dt><span class="kbd">Q</span> <span class="kbd">E</span> / <span class="kbd">Wheel</span></dt><dd>Turn and zoom the view</dd>
+      <dt><span class="kbd">V</span></dt><dd>Keeper's view, from the gallery</dd>
+      <dt><span class="kbd">Esc</span></dt><dd>Pause</dd>
+      <dt>Touch</dt><dd>Drag to aim; use the Focus and Flare buttons</dd>
+    </dl>
+    <div class="btns"><button class="btn primary" id="b-how-close" type="button">Back</button></div>
+  </div>
+</div>
+
+<div id="settings" class="overlay" hidden>
+  <div class="sheet">
+    <div class="eyebrow">Settings</div>
+    <h3>The lamp room</h3>
+    <div class="set-row"><label>Graphics</label><div class="seg" id="set-quality">
+      <button type="button" data-q="low">Low</button><button type="button" data-q="medium">Medium</button><button type="button" data-q="high">High</button></div></div>
+    <div class="set-row"><label for="set-vol">Volume</label><input id="set-vol" type="range" min="0" max="1" step="0.05" value="0.8"></div>
+    <div class="set-row"><label for="set-sens">Keeper's view look</label><input id="set-sens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
+    <div class="set-row"><label>Tips</label><div class="seg" id="set-tips"><button type="button" data-t="1">On</button><button type="button" data-t="0">Off</button></div></div>
+    <p id="fps-note" class="num" style="margin:4px 0 0;font-size:.85rem"></p>
+    <div class="btns"><button class="btn primary" id="b-set-close" type="button">Done</button></div>
+  </div>
+</div>
+
+<div id="pause" class="overlay" hidden style="background:rgba(5,8,13,.55)">
+  <div class="sheet">
+    <div class="eyebrow" id="pause-eyebrow">Paused</div>
+    <h3>The watch can wait</h3>
+    <p class="log" id="pause-note" style="color:var(--foam);font-size:1.05rem"></p>
+    <div class="btns">
+      <button class="btn primary" id="b-resume" type="button">Resume</button>
+      <button class="btn" id="b-p-settings" type="button">Settings</button>
+      <button class="btn" id="b-p-how" type="button">How to play</button>
+      <button class="btn ghost" id="b-quit" type="button">Leave the island</button>
+    </div>
+  </div>
+</div>
+
+<div id="end" class="overlay" hidden style="background:rgba(5,8,13,.5)">
+  <div class="sheet">
+    <div class="eyebrow" id="end-eyebrow"></div>
+    <h3 id="end-title"></h3>
+    <p class="log" id="end-note" style="color:var(--foam);font-size:1.08rem"></p>
+    <div class="stats" id="end-stats"></div>
+    <div class="btns" id="end-btns"></div>
+  </div>
+</div>
+
+<div id="err" class="overlay" hidden><div class="sheet"><h3>The lamp won't light</h3><p id="err-msg"></p></div></div>
+
+<script>

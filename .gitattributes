@@ -2,3 +2,4 @@
 # Marking it generated keeps it out of diffs and out of the language stats.
 index.html linguist-generated=true
 docs/*.jpg binary
+lighthouse/index.html linguist-generated=true

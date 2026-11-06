@@ -10,7 +10,9 @@
     "test:controls": "node tests/controls.test.js",
     "test:nolock": "node tests/controls.test.js --nolock",
     "test:systems": "node tests/systems.test.js",
-    "test:match": "node tests/match.test.js"
+    "test:match": "node tests/match.test.js",
+    "build:lighthouse": "python3 lighthouse/build.py",
+    "test:lighthouse": "node lighthouse/tests/rules.test.js && node lighthouse/tests/flow.test.js && node lighthouse/tests/balance.test.js"
   },
   "dependencies": {
     "three": "0.128.0"
